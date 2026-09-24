@@ -6,7 +6,15 @@ import { getTileId } from '../world/GameMap';
 import { TILES } from '../world/Tile';
 import { isExplored, isVisible } from '../fov/VisibilityState';
 import { canSpot } from '../engine/GameState';
-import { FACTIONS, standingBetween } from '../world/Factions';
+import { standingBetween } from '../world/Factions';
+
+/** Wants you dead. */
+const HOSTILE_MARK = '#e05252';
+/** On your side — allies, and pets once those exist. */
+const ALLIED_MARK = '#6fd3a0';
+const MARK_WIDTH = 2;
+/** The look cursor: bright and unlike any faction mark, so it reads as UI rather than a creature. */
+const CURSOR_COLOR = '#ffffff';
 import { ITEMS } from '../items/ItemData';
 import type { Camera } from './Camera';
 import type { Point } from '../utils/geometry';
@@ -20,6 +28,7 @@ export class Renderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly camera: Camera;
   private ratio = 0;
+  private cursor: Point | null = null;
 
   constructor(canvas: HTMLCanvasElement, camera: Camera) {
     this.canvas = canvas;
@@ -30,6 +39,11 @@ export class Renderer {
     this.ctx = ctx;
 
     this.resize();
+  }
+
+  /** Where the look cursor sits, or null when not looking at anything. */
+  setCursor(cursor: Point | null): void {
+    this.cursor = cursor;
   }
 
   /** The element whose size the canvas fills — what a ResizeObserver should watch. */
@@ -80,21 +94,23 @@ export class Renderer {
   }
 
   /**
-   * Rings a creature in its faction's colour, so who belongs to whom is readable at a glance —
-   * the thing that matters most once two groups are fighting each other on the same screen.
-   * Thicker for anything hostile to the player, so "will this kill me" survives the same glance.
-   * The player's own faction is left unmarked: no point ringing everything.
+   * Rings a creature according to what it is to *you*, not which faction it belongs to.
+   *
+   * Only two cases are worth marking: something that wants you dead, and something fighting on
+   * your side. Everything else — the great neutral middle, including animals that will bite you
+   * if you corner them — gets no ring at all, because marking everything is the same as marking
+   * nothing. Which faction someone belongs to is already carried by their glyph colour, which is
+   * enough: factions are mostly a human concern.
    */
-  private drawFactionMark(screen: Point, playerFaction: string, faction: string): void {
-    if (faction === playerFaction) return;
-    const color = FACTIONS[faction]?.color;
-    if (!color) return;
+  private drawStandingMark(screen: Point, playerFaction: string, faction: string): void {
+    const standing = standingBetween(playerFaction, faction);
+    if (standing === 'neutral') return;
+    if (faction === playerFaction) return; // you don't need ringing
 
-    const width = standingBetween(playerFaction, faction) === 'hostile' ? 2 : 1;
-    const inset = width / 2;
-    this.ctx.strokeStyle = color;
-    this.ctx.lineWidth = width;
-    this.ctx.strokeRect(screen.x + inset, screen.y + inset, TILE_SIZE - width, TILE_SIZE - width);
+    this.ctx.strokeStyle = standing === 'hostile' ? HOSTILE_MARK : ALLIED_MARK;
+    this.ctx.lineWidth = MARK_WIDTH;
+    const inset = MARK_WIDTH / 2;
+    this.ctx.strokeRect(screen.x + inset, screen.y + inset, TILE_SIZE - MARK_WIDTH, TILE_SIZE - MARK_WIDTH);
   }
 
   render(state: GameState): void {
@@ -147,7 +163,7 @@ export class Renderer {
     for (const npc of region.npcs) {
       if (!canSpot(state, npc.x, npc.y)) continue;
       const screen = this.camera.worldToScreen(npc.x, npc.y);
-      this.drawFactionMark(screen, state.player.faction, npc.faction);
+      this.drawStandingMark(screen, state.player.faction, npc.faction);
       ctx.fillStyle = npc.fg;
       ctx.fillText(npc.glyph, screen.x + 2, screen.y + 2);
     }
@@ -155,7 +171,7 @@ export class Renderer {
     for (const monster of region.monsters) {
       if (!canSpot(state, monster.x, monster.y)) continue;
       const screen = this.camera.worldToScreen(monster.x, monster.y);
-      this.drawFactionMark(screen, state.player.faction, monster.faction);
+      this.drawStandingMark(screen, state.player.faction, monster.faction);
       ctx.fillStyle = monster.fg;
       ctx.fillText(monster.glyph, screen.x + 2, screen.y + 2);
     }
@@ -164,6 +180,13 @@ export class Renderer {
       const playerScreen = this.camera.worldToScreen(state.player.x, state.player.y);
       ctx.fillStyle = state.player.fg;
       ctx.fillText(state.player.glyph, playerScreen.x + 2, playerScreen.y + 2);
+    }
+
+    if (this.cursor) {
+      const screen = this.camera.worldToScreen(this.cursor.x, this.cursor.y);
+      ctx.strokeStyle = CURSOR_COLOR;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(screen.x + 1, screen.y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
     }
   }
 }

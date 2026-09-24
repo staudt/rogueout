@@ -52,3 +52,10 @@ export const KICK_ITEM_RANGE = 3;
 
 /** Upper bound for "walk that way until something happens" — larger than any map. */
 export const MAX_TRAVEL_DISTANCE = 200;
+
+/**
+ * How hard a creature will look for a way around an obstruction before giving up. Small on
+ * purpose: this is for stepping round a packmate in a doorway, not for solving the map, and it
+ * runs for every blocked hunter every turn.
+ */
+export const DETOUR_NODE_BUDGET = 150;

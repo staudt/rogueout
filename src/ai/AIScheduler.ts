@@ -18,7 +18,8 @@ import {
 } from '../narrative/Narration';
 import { areHostile } from '../world/Factions';
 import { isVisible } from '../fov/VisibilityState';
-import { MAX_ACTIONS_PER_TURN, NORMAL_SPEED } from '../config/constants';
+import { DETOUR_NODE_BUDGET, MAX_ACTIONS_PER_TURN, NORMAL_SPEED } from '../config/constants';
+import { findPath } from '../pathfinding/BFS';
 
 const ALL_DIRECTIONS: readonly Direction[] = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'];
 
@@ -207,10 +208,39 @@ function attackPlayer(monster: Monster, state: GameState, rng: RNG): void {
   }
 }
 
+/**
+ * Closes on a target, going *around* whatever is in the way.
+ *
+ * The straight step is tried first because it's free and almost always right. Only when it's
+ * blocked — by a wall, or by a packmate standing in the doorway — does this fall back to a real
+ * search. Without that fallback anything hunting you simply stops the moment another creature is
+ * between you, which is fine for a mold and absurd for a feral ghoul.
+ *
+ * The search is deliberately cheap. It needs a way *round the obstruction*, not a grand tour of
+ * the map, so the node budget is small; if no short detour exists the creature holds position
+ * rather than spending the turn wandering off.
+ */
 function moveToward(monster: Monster, target: Point, state: GameState, region: RegionState): void {
   const dx = Math.sign(target.x - monster.x);
   const dy = Math.sign(target.y - monster.y);
-  tryMoveMonster(monster, { x: monster.x + dx, y: monster.y + dy }, state, region);
+  if (tryMoveMonster(monster, { x: monster.x + dx, y: monster.y + dy }, state, region)) return;
+
+  const path = findPath(monster, target, passableForMonster(monster, state, region), DETOUR_NODE_BUDGET);
+  const next = path?.[0];
+  if (next) tryMoveMonster(monster, next, state, region);
+}
+
+/**
+ * Where this creature could stand. The target's own tile counts as passable — otherwise `findPath`
+ * refuses a goal that is, by definition, occupied by the thing being hunted — and stepping onto
+ * it is prevented by tryMoveMonster anyway, so arriving adjacent is what actually happens.
+ */
+function passableForMonster(monster: Monster, state: GameState, region: RegionState) {
+  return (x: number, y: number): boolean => {
+    if (!isWalkable(region.map, x, y)) return false;
+    if (x === state.player.x && y === state.player.y) return true;
+    return !region.monsters.some((m) => m !== monster && m.hp > 0 && m.x === x && m.y === y);
+  };
 }
 
 function wander(monster: Monster, state: GameState, region: RegionState, rng: RNG): void {
@@ -218,13 +248,15 @@ function wander(monster: Monster, state: GameState, region: RegionState, rng: RN
   tryMoveMonster(monster, addPoints(monster, DIRECTION_VECTORS[direction]), state, region);
 }
 
-function tryMoveMonster(monster: Monster, target: Point, state: GameState, region: RegionState): void {
-  if (!isWalkable(region.map, target.x, target.y)) return;
-  if (target.x === state.player.x && target.y === state.player.y) return;
-  if (region.monsters.some((m) => m !== monster && m.hp > 0 && m.x === target.x && m.y === target.y)) return;
+/** Moves if the tile is free. Returns whether it actually went anywhere. */
+function tryMoveMonster(monster: Monster, target: Point, state: GameState, region: RegionState): boolean {
+  if (!isWalkable(region.map, target.x, target.y)) return false;
+  if (target.x === state.player.x && target.y === state.player.y) return false;
+  if (region.monsters.some((m) => m !== monster && m.hp > 0 && m.x === target.x && m.y === target.y)) return false;
 
   monster.x = target.x;
   monster.y = target.y;
+  return true;
 }
 
 /**

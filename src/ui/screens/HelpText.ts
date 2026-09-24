@@ -24,6 +24,7 @@ export const HELP_LINES: readonly string[] = [
   '  > / <             descend / climb a staircase',
   '',
   'SCREENS',
+  '  ;                 look at something (cursor or click)',
   '  C                 character sheet',
   '  Esc               game menu, or close the current screen',
   '',

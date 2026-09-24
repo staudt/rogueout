@@ -234,3 +234,62 @@ describe('townsfolk', () => {
     expect(region.npcs[0]).toMatchObject({ x: 6, y: 4 });
   });
 });
+
+describe('hunters go around obstructions', () => {
+  /** A one-tile-wide gap is the case that used to stop a hunter dead. */
+  function corridor(): RegionState {
+    const map = createGameMap(12, 5, 'wall');
+    for (let y = 1; y < 4; y++) for (let x = 1; x < 11; x++) setTileId(map, x, y, 'floor');
+    const visibility = createVisibility(12, 5);
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 12; x++) markVisible(visibility, x, y);
+    return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+  }
+
+  it('steps around a packmate standing between it and its target', () => {
+    const region = corridor();
+    const hunter = createMonster({ ...MONSTERS['feralGhoul']!, speed: 12, awarenessRadius: 20 }, 1, 2);
+    const blocker = createMonster({ ...MONSTERS['feralGhoul']!, behavior: 'wander', speed: 0 }, 2, 2);
+    region.monsters.push(hunter, blocker);
+    const state = arenaState(region, 6, 2);
+
+    runMonsterTurns(state, createRNG(1));
+
+    // The straight step was taken, so it went round: same column, different row.
+    expect([hunter.x, hunter.y]).not.toEqual([1, 2]);
+    expect(hunter.y).not.toBe(2);
+  });
+
+  it('still closes the distance over several turns despite the obstruction', () => {
+    const region = corridor();
+    const hunter = createMonster({ ...MONSTERS['feralGhoul']!, speed: 12, awarenessRadius: 20 }, 1, 2);
+    const blocker = createMonster({ ...MONSTERS['feralGhoul']!, behavior: 'wander', speed: 0 }, 2, 2);
+    region.monsters.push(hunter, blocker);
+    const state = arenaState(region, 8, 2);
+
+    const before = chebyshevDistance(hunter, state.player);
+    for (let turn = 0; turn < 6; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+    }
+
+    expect(chebyshevDistance(hunter, state.player)).toBeLessThan(before);
+  });
+
+  it('holds position rather than wandering off when there is genuinely no way round', () => {
+    // A sealed pocket: the hunter can see out but cannot get out.
+    const map = createGameMap(9, 5, 'wall');
+    setTileId(map, 1, 2, 'floor');
+    for (let x = 3; x < 8; x++) setTileId(map, x, 2, 'floor');
+    const visibility = createVisibility(9, 5);
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 9; x++) markVisible(visibility, x, y);
+    const region: RegionState = { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+
+    const hunter = createMonster({ ...MONSTERS['feralGhoul']!, speed: 12, awarenessRadius: 20 }, 1, 2);
+    region.monsters.push(hunter);
+    const state = arenaState(region, 6, 2);
+
+    for (let turn = 0; turn < 5; turn++) runMonsterTurns(state, createRNG(turn + 1));
+
+    expect([hunter.x, hunter.y]).toEqual([1, 2]);
+  });
+});

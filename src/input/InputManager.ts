@@ -18,7 +18,22 @@ function isArrowKey(key: string): key is ArrowKey {
  * f fire, . wait, > descend, < climb. `C` (character sheet) is not a NetHack key — NetHack uses
  * ^X — but a plain letter is friendlier and ^X is awkward to type in a browser.
  */
-export type ActionKey = ',' | 'w' | 'W' | 'q' | 'i' | 'f' | '.' | '>' | '<' | 'C' | 'k' | 'g' | 'd' | 't';
+export type ActionKey =
+  | ','
+  | 'w'
+  | 'W'
+  | 'q'
+  | 'i'
+  | 'f'
+  | '.'
+  | '>'
+  | '<'
+  | 'C'
+  | 'k'
+  | 'g'
+  | 'd'
+  | 't'
+  | ';';
 const ACTION_KEYS: ReadonlySet<string> = new Set<ActionKey>([
   ',',
   'w',
@@ -34,6 +49,7 @@ const ACTION_KEYS: ReadonlySet<string> = new Set<ActionKey>([
   'g', // go: travel in a direction until something happens
   'd', // drop
   't', // throw
+  ';', // look: what is that?
 ]);
 
 function isActionKey(key: string): key is ActionKey {
@@ -49,6 +65,10 @@ export interface InputCallbacks {
   onOpenMenu: () => void;
   /** Escape, while no menu is active — opens the game menu (character sheet, help, title). */
   onOpenGameMenu: () => void;
+  /** Look mode: the cursor moves instead of the player. */
+  onLookMove: (direction: Direction) => void;
+  onLookConfirm: () => void;
+  onLookCancel: () => void;
   onMenuUp: () => void;
   onMenuDown: () => void;
   onMenuConfirm: () => void;
@@ -64,8 +84,24 @@ export class InputManager {
   private readonly callbacks: InputCallbacks;
   private menuActive = false;
   private directionPrompt: ((direction: Direction | null) => void) | null = null;
+  private lookActive = false;
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    // Look mode owns Enter and Escape; arrows reach it through the chord detector, so the cursor
+    // moves diagonally exactly the way the player does.
+    if (this.lookActive && !isArrowKey(event.key)) {
+      if (event.key === 'Enter' || event.key === ';') {
+        event.preventDefault();
+        this.callbacks.onLookConfirm();
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.callbacks.onLookCancel();
+        return;
+      }
+    }
+
     if (this.menuActive) {
       if (event.key === 'ArrowUp') {
         event.preventDefault();
@@ -142,6 +178,10 @@ export class InputManager {
         prompt(direction);
         return;
       }
+      if (this.lookActive) {
+        callbacks.onLookMove(direction);
+        return;
+      }
       if (!this.menuActive) callbacks.onDirection(direction);
     }, DIAGONAL_CHORD_WINDOW_MS);
   }
@@ -156,6 +196,14 @@ export class InputManager {
 
   isAwaitingDirection(): boolean {
     return this.directionPrompt !== null;
+  }
+
+  setLookActive(active: boolean): void {
+    this.lookActive = active;
+  }
+
+  isLookActive(): boolean {
+    return this.lookActive;
   }
 
   /** Switches between movement/action-key dispatch and menu-navigation dispatch. */

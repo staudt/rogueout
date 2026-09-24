@@ -43,6 +43,7 @@ import { createLocalStorageAdapter, type SaveStorage } from '../persistence/Loca
 import { clearSave, hasSave, loadGame, saveGame } from '../persistence/SaveGame';
 import { ScreenManager } from '../ui/screens/ScreenManager';
 import { describeCharacter } from '../ui/screens/CharacterSheet';
+import { describeTile } from '../ui/Describe';
 import { HELP_LINES } from '../ui/screens/HelpText';
 
 type ShopAction =
@@ -66,6 +67,7 @@ type CommandAction =
   | 'use'
   | 'fire'
   | 'wait'
+  | 'look'
   | 'character';
 
 type TitleAction = 'continue' | 'new-game' | 'controls';
@@ -93,6 +95,8 @@ export class Game {
   /** Guards against pushing the game-over screen more than once for the same death. */
   private gameOverShown = false;
   private resizeFrameId: number | null = null;
+  /** Where the `;` cursor is, or null when not looking. */
+  private lookCursor: Point | null = null;
   /** For effects Game resolves itself (kicks, throws) rather than routing through TurnManager. */
   private rng: RNG = createRNG(Date.now());
   private readonly storage: SaveStorage;
@@ -141,6 +145,9 @@ export class Game {
         this.cancelAutoTravel();
         this.openGameMenu();
       },
+      onLookMove: (direction) => this.moveLookCursor(direction),
+      onLookConfirm: () => this.confirmLook(),
+      onLookCancel: () => this.endLook('Never mind.'),
       onMenuUp: () => this.screens.moveSelection(-1),
       onMenuDown: () => this.screens.moveSelection(1),
       onMenuConfirm: () => this.screens.confirmSelection(),
@@ -199,6 +206,14 @@ export class Game {
 
   private handleMapClick(target: Point): void {
     if (this.state.gameOver || this.screens.isOpen()) return;
+
+    // Looking takes priority: while the cursor is up, a click is pointing at something.
+    if (this.input.isLookActive()) {
+      this.endLook();
+      this.showDescription(target);
+      return;
+    }
+
     endMessageGroup(this.state);
     this.cancelAutoTravel();
 
@@ -450,7 +465,61 @@ export class Game {
       case 'd':
         this.openDropMenu();
         break;
+      case ';':
+        this.startLook();
+        break;
     }
+  }
+
+  /**
+   * `;` — "what is that?". A cursor you drive with the movement keys (or click straight at
+   * something), rather than a menu, so you can point at anything on screen including terrain.
+   */
+  private startLook(): void {
+    if (this.state.gameOver) return;
+    this.lookCursor = { x: this.state.player.x, y: this.state.player.y };
+    this.input.setLookActive(true);
+    this.renderer.setCursor(this.lookCursor);
+    addMessage(this.state, 'Look at what? Move the cursor and press Enter, or click. Esc to stop.');
+    endMessageGroup(this.state);
+    this.render();
+  }
+
+  private moveLookCursor(direction: Direction): void {
+    if (!this.lookCursor) return;
+    const region = getActiveRegion(this.state);
+    const vector = DIRECTION_VECTORS[direction];
+
+    this.lookCursor = {
+      x: Math.max(0, Math.min(region.map.width - 1, this.lookCursor.x + vector.x)),
+      y: Math.max(0, Math.min(region.map.height - 1, this.lookCursor.y + vector.y)),
+    };
+    this.renderer.setCursor(this.lookCursor);
+    this.render();
+  }
+
+  private confirmLook(): void {
+    const cursor = this.lookCursor;
+    this.endLook();
+    if (cursor) this.showDescription(cursor);
+  }
+
+  private endLook(note?: string): void {
+    this.lookCursor = null;
+    this.input.setLookActive(false);
+    this.renderer.setCursor(null);
+    if (note) addMessage(this.state, note);
+    this.render();
+  }
+
+  private showDescription(at: Point): void {
+    const description = describeTile(this.state, at.x, at.y);
+    this.screens.push<never>({
+      title: description.title,
+      lines: description.lines,
+      options: [],
+      footer: 'Esc to close',
+    });
   }
 
   /**
@@ -621,6 +690,7 @@ export class Game {
       { label: 'Go until something happens', value: 'go', hint: '[g]' },
       { label: 'Fire', value: 'fire', hint: '[f]' },
       { label: 'Wait a turn', value: 'wait', hint: '[.]' },
+      { label: 'Look at something', value: 'look', hint: '[;]' },
       { label: 'Character sheet', value: 'character', hint: '[C]' },
     );
 
@@ -690,6 +760,10 @@ export class Game {
       case 'go':
         this.screens.closeAll();
         this.promptDirection('Go in which direction?', (direction) => this.travelInDirection(direction));
+        break;
+      case 'look':
+        this.screens.closeAll();
+        this.startLook();
         break;
     }
   }
