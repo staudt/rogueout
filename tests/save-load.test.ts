@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { clearSave, hasSave, loadGame, saveGame } from '../src/persistence/SaveGame';
-import { createMemoryStorage } from '../src/persistence/LocalStorageAdapter';
+import { createLocalStorageAdapter, createMemoryStorage, SAVE_KEY } from '../src/persistence/LocalStorageAdapter';
 import { migrate, SAVE_SCHEMA_VERSION, toSaveData } from '../src/persistence/SaveSchema';
 import type { GameState, RegionState } from '../src/engine/GameState';
 import { addMessage } from '../src/engine/GameState';
@@ -177,6 +177,50 @@ describe('malformed saves fall back to New Game', () => {
     parsed.regions['overworld'].map.tiles = parsed.regions['overworld'].map.tiles.slice(0, 10);
     return JSON.stringify(parsed);
   }
+});
+
+describe('the rename from roguelite to rogueout', () => {
+  const LEGACY_KEY = 'roguelite:save';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('picks up a run saved under the old key', () => {
+    // Losing someone's in-progress run to a cosmetic rename would be exactly the failure the
+    // permadeath save exists to prevent.
+    const { state } = makeRun();
+    state.player.gold = 99;
+    window.localStorage.setItem(LEGACY_KEY, JSON.stringify(toSaveData(state)));
+
+    const storage = createLocalStorageAdapter();
+
+    expect(hasSave(storage)).toBe(true);
+    expect(loadGame(storage)!.player.gold).toBe(99);
+  });
+
+  it('moves the run onto the new key on the next save, and leaves the old one behind', () => {
+    const { state } = makeRun();
+    window.localStorage.setItem(LEGACY_KEY, JSON.stringify(toSaveData(state)));
+    const storage = createLocalStorageAdapter();
+
+    saveGame(storage, loadGame(storage)!);
+
+    expect(window.localStorage.getItem(SAVE_KEY)).not.toBeNull();
+    expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull();
+  });
+
+  it('erases both keys on death, so an old save cannot resurrect a dead run', () => {
+    const { state } = makeRun();
+    window.localStorage.setItem(LEGACY_KEY, JSON.stringify(toSaveData(state)));
+    const storage = createLocalStorageAdapter();
+    saveGame(storage, state);
+
+    clearSave(storage);
+
+    expect(hasSave(storage)).toBe(false);
+    expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull();
+  });
 });
 
 describe('storage failures', () => {

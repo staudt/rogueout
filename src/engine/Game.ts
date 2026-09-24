@@ -570,7 +570,7 @@ export class Game {
     options.push({ label: 'New game', value: 'new-game' }, { label: 'Controls', value: 'controls' });
 
     this.screens.replace<TitleAction>({
-      title: 'ROGUELITE',
+      title: 'ROGUEOUT',
       lines: [note ?? 'A small expedition into the wilds.', ''],
       options,
       dismissable: false,

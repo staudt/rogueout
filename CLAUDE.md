@@ -1,10 +1,12 @@
-# Roguelite — Project Context
+# Rogueout — Project Context
 
 Persistent context for AI-assisted sessions working on this repo. Read this before making architectural changes.
 
 ## Vision
 
-A browser-based, turn-based roguelike combining classic Rogue/NetHack dungeon-crawling (character/glyph tiles, colors, keyboard-driven play) with a Fallout-style open-world structure: towns, open wilderness, and dungeons, rather than pure dungeon-diving.
+**Rogueout** — *Rogue* + *Fallout* — a browser-based, turn-based roguelike combining classic Rogue/NetHack dungeon-crawling (character/glyph tiles, colors, keyboard-driven play) with a Fallout-style open-world structure: towns, open wilderness, and dungeons, rather than pure dungeon-diving. The name is the pitch: the two halves of the design are right there in it.
+
+Live at https://staudt.github.io/rogueout/ (repo `staudt/rogueout`, deployed from `main`).
 
 The full design plan (decisions, algorithms, milestone breakdown) lives at
 `~/.claude/plans/let-s-build-a-web-based-cheerful-sphinx.md` on the machine that created this repo — treat this file as the durable, in-repo summary of it.
@@ -14,7 +16,7 @@ The full design plan (decisions, algorithms, milestone breakdown) lives at
 - TypeScript + Vite (`vanilla-ts` template). No framework.
 - Single `<canvas id="game-canvas">`, monospace glyph-grid rendering (NetHack-style fg/bg per cell).
 - Vitest for unit tests (`npm test`), jsdom environment (needed for DOM-event-driven input tests).
-- No backend — all state lives client-side; persistence is a single `localStorage` slot (`roguelite:save`), written every turn and erased on death (permadeath — see M9 below).
+- No backend — all state lives client-side; persistence is a single `localStorage` slot (`rogueout:save`), written every turn and erased on death (permadeath — see M9 below).
 - Deploy target: GitHub Pages (static). `vite.config.ts` uses `base: './'` (relative) so the build works unmodified from a plain local static server, `npm run preview`, and a GitHub Pages project subpath alike — no repo-name hardcoding needed.
 
 ## Commands
@@ -114,7 +116,7 @@ Items (weapons/armor) have durability that decreases with use and breaks at 0. N
   - **`base: './'` was already correct and is now proven**, not assumed: before pushing, `dist/` was served from a `/rogueout/` subdirectory on a local static server to mimic a project page. All assets resolved relatively, nothing requested from the domain root. Worth reusing whenever the build config changes — it catches base-path bugs without waiting on a deploy.
   - **The live-URL smoke test also confirms the production build strips the dev hook**: `window.__gameDebug` is undefined there (the M7 dead-code-elimination claim, verified on the real artifact rather than the bundle size). Since that leaves no way to read state, the smoke test drives the game purely through keyboard/DOM and counts non-black canvas pixels to prove it's actually drawing and that moving changes the view — see the approach in the M10 smoke script if a deploy ever needs re-testing.
   - Action versions are pinned to majors (`checkout@v7`, `setup-node@v7`, `upload-pages-artifact@v5`, `deploy-pages@v5`) — the first deploy ran on v4/v3 and GitHub warned they force Node 20, now deprecated. Worth re-checking whenever a run starts emitting deprecation annotations.
-  - **Naming mismatch, left deliberately**: the repo is `rogueout` while `package.json` and this file say `roguelite`. Nothing depends on it (the base path is relative, so the repo could be renamed without touching a line of code), but it's the kind of thing that looks like a bug later — the user was told and chose to leave it for now.
+  - **The project was called `roguelite` until just after this deploy**, then renamed to **Rogueout** (*Rogue* + *Fallout*) to match the repo and the actual pitch. Renamed: `package.json`/lockfile, `<title>`, the in-game title screen, this file, and the save key. The old `roguelite:save` localStorage key is still *read* as a fallback in `LocalStorageAdapter.ts` so a run in progress survived the rename — the next save moves it to the new key and drops the old one, and `clear()` removes both so a dead run can't resurrect from it. That fallback is explicitly temporary; delete it once nobody could still be carrying a pre-rename save. **Not renamed: the working directory**, still `~/Work/roguelite` — a local rename would break open editors/shells, so it's the user's call.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).

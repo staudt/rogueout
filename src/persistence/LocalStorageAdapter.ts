@@ -8,7 +8,17 @@ export interface SaveStorage {
   clear(): void;
 }
 
-export const SAVE_KEY = 'roguelite:save';
+export const SAVE_KEY = 'rogueout:save';
+
+/**
+ * The key used before the game was renamed from "roguelite" to "rogueout".
+ *
+ * Read as a fallback so a run already in progress survives the rename — losing someone's saved
+ * run to a cosmetic change would be the exact failure the permadeath save exists to avoid. The
+ * next write lands on the new key and drops this one, so it matters for exactly one load per
+ * browser. Safe to delete once nobody could still be carrying a pre-rename save.
+ */
+const LEGACY_SAVE_KEY = 'roguelite:save';
 
 /**
  * localStorage, with every call wrapped: it throws on quota exhaustion and is entirely absent in
@@ -19,7 +29,7 @@ export function createLocalStorageAdapter(key: string = SAVE_KEY): SaveStorage {
   return {
     read() {
       try {
-        return window.localStorage.getItem(key);
+        return window.localStorage.getItem(key) ?? window.localStorage.getItem(LEGACY_SAVE_KEY);
       } catch {
         return null;
       }
@@ -27,6 +37,7 @@ export function createLocalStorageAdapter(key: string = SAVE_KEY): SaveStorage {
     write(data: string) {
       try {
         window.localStorage.setItem(key, data);
+        window.localStorage.removeItem(LEGACY_SAVE_KEY);
       } catch {
         /* out of quota, or storage blocked — the run continues, unsaved. */
       }
@@ -34,6 +45,7 @@ export function createLocalStorageAdapter(key: string = SAVE_KEY): SaveStorage {
     clear() {
       try {
         window.localStorage.removeItem(key);
+        window.localStorage.removeItem(LEGACY_SAVE_KEY);
       } catch {
         /* nothing we can do, and nothing worth crashing over. */
       }
