@@ -1,0 +1,120 @@
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  gap: 4px;
+}
+
+#viewport {
+  position: relative;
+}
+
+#game-canvas {
+  image-rendering: pixelated;
+  background: #000;
+  display: block;
+}
+
+#menu-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  min-width: 220px;
+  max-width: calc(100% - 40px);
+  background: #111;
+  border: 1px solid #666;
+  color: #eee;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+/* Title and game-over: conceptually the whole screen, not a panel over a map you're playing. */
+#menu-overlay.centered {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 300px;
+  padding: 16px 20px;
+}
+
+#menu-overlay .menu-title {
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #fff;
+}
+
+/* Static text rows (character sheet, help, death summary) — pre so padEnd alignment survives. */
+#menu-overlay .menu-line {
+  white-space: pre;
+  color: #bbb;
+  line-height: 1.35em;
+}
+
+#menu-overlay .menu-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 2px 4px;
+  cursor: pointer;
+  white-space: pre;
+}
+
+#menu-overlay .menu-option.selected {
+  background: #2a4;
+  color: #000;
+}
+
+#menu-overlay .menu-option-hint {
+  color: #8f8;
+  opacity: 0.8;
+  font-size: 12px;
+}
+
+#menu-overlay .menu-option.selected .menu-option-hint {
+  color: #044;
+  opacity: 1;
+}
+
+#menu-overlay .menu-empty {
+  color: #888;
+  font-style: italic;
+}
+
+#menu-overlay .menu-hint {
+  margin-top: 6px;
+  color: #888;
+  font-size: 11px;
+}
+
+#message-log {
+  width: 800px;
+  max-width: 90vw;
+  height: 7.5em;
+  overflow-y: auto;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  color: #ccc;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.25em;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
