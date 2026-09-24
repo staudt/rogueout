@@ -1,12 +1,14 @@
 import type { Entity } from './Entity';
 import type { Combatant } from '../combat/Combatant';
 import type { MonsterBehavior, MonsterDef } from './MonsterData';
+import type { FactionId } from '../world/Factions';
 
 export interface Monster extends Entity, Combatant {
   readonly kind: 'monster';
   defId: string;
   behavior: MonsterBehavior;
   awarenessRadius: number;
+  faction: FactionId;
 }
 
 let nextInstanceId = 0;
@@ -44,5 +46,6 @@ export function createMonster(def: MonsterDef, x: number, y: number): Monster {
     tags: [...def.tags],
     behavior: def.behavior,
     awarenessRadius: def.awarenessRadius,
+    faction: def.faction,
   };
 }

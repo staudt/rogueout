@@ -7,6 +7,7 @@ import { stairwayDirection, type StairwayDirection } from '../world/Tile';
 import { computeFOV } from '../fov/Shadowcasting';
 import { markVisible, resetVisible } from '../fov/VisibilityState';
 import { computeFovRadius } from '../combat/CombatFormulas';
+import { DAYLIGHT_SIGHT_RADIUS } from '../config/constants';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
 import { hasTag } from '../combat/DamageTypes';
 import type { Monster } from '../entities/Monster';
@@ -140,10 +141,12 @@ export class TurnManager {
     const region = getActiveRegion(this.state);
     const { player } = this.state;
     resetVisible(region.visibility);
+    // Under open sky the limit is the land, not the light; underground it's what you carry.
+    const radius = region.daylight ? DAYLIGHT_SIGHT_RADIUS : computeFovRadius(player.special.perception);
     computeFOV(
       player.x,
       player.y,
-      computeFovRadius(player.special.perception),
+      radius,
       (x, y) => isOpaque(region.map, x, y),
       (x, y) => markVisible(region.visibility, x, y),
     );

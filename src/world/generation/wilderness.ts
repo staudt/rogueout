@@ -18,15 +18,21 @@ import type { Rect } from './Rect';
 const TERRAIN_SCALE = 14;
 const MOISTURE_SCALE = 9;
 
+/**
+ * Tuned for a desert: water is rare enough to be an event, scrub clings on in the wetter hollows,
+ * and most of the map is sand. Rock ridges are left common — they're what makes the open ground
+ * worth crossing rather than a featureless plain, and under daylight sight they're the only thing
+ * that hides anything.
+ */
 export const TERRAIN_THRESHOLDS = {
-  /** Below this elevation is water. */
-  water: 0.34,
+  /** Below this elevation is water. Rare: a desert's water is worth walking to. */
+  water: 0.26,
   /** Above this elevation is impassable rock. */
-  rock: 0.72,
-  /** Above this moisture (on ordinary land) is forest. */
-  tree: 0.66,
-  /** Above this moisture (on ordinary land) is grass; below it, sand. */
-  grass: 0.45,
+  rock: 0.70,
+  /** Above this moisture (on ordinary land) is a stand of dry trees. */
+  tree: 0.82,
+  /** Above this moisture (on ordinary land) is scrub grass; below it, sand. */
+  grass: 0.62,
 } as const;
 
 export function terrainAt(seed: number, x: number, y: number): string {

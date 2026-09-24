@@ -3,8 +3,7 @@ import { findPath } from '../src/pathfinding/BFS';
 import { walkableLineToward } from '../src/pathfinding/StraightLine';
 import { chebyshevDistance, linePoints, type Point } from '../src/utils/geometry';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
-import { getTileId, isWalkable, type GameMapData } from '../src/world/GameMap';
-import { OVERWORLD_SPAWN } from '../src/world/maps/overworld';
+import { isWalkable, type GameMapData } from '../src/world/GameMap';
 import type { RegionState } from '../src/engine/GameState';
 
 function isPassableFor(rows: readonly string[]) {
@@ -136,51 +135,98 @@ describe('walkableLineToward (heading for somewhere you cannot reach)', () => {
   });
 });
 
-describe('a creature holding a one-tile crossing (the real overworld)', () => {
-  // The stitched road crosses a lake on a causeway exactly one tile wide, so a single creature
-  // standing on it severs the map. That is the situation behind "You can't find a path there."
-  // on ground the player has already explored — and the reason a click there should still walk
-  // to the near side instead of refusing outright.
-  const CAUSEWAY = { x: 26, y: 14 };
-  /** Beyond the lake — reachable normally, cut off entirely when the causeway is held. */
-  const FAR_SIDE = { x: 45, y: 1 };
+describe('no single creature can cut the world in half (the real overworld)', () => {
+  /**
+   * This used to be false. Before the map became a desert, the road crossed a lake on a causeway
+   * exactly one tile wide, and one wandering rat standing on it cut off 695 of 1538 walkable
+   * tiles — 45% of the world, unreachable until it moved. Making water rare removed the bridge
+   * and with it the chokepoint.
+   *
+   * Guarded rather than merely fixed, because it's the kind of thing terrain tuning can
+   * reintroduce silently: any future map where one body can sever the world will fail here.
+   */
+  const MAX_CUT_FRACTION = 0.05;
 
-  function overworld() {
-    const regions: Record<string, RegionState> = {};
-    return ensureRegionLoaded(regions, 'overworld').map;
+  function worstSingleTileCut(map: GameMapData): { cut: number; walkable: number } {
+    const walkable: Array<[number, number]> = [];
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) if (isWalkable(map, x, y)) walkable.push([x, y]);
+    }
+
+    let worst = 0;
+    for (const [bx, by] of walkable) {
+      // Prune: if this tile's walkable neighbours form one unbroken run around it, they can all
+      // reach each other by walking around it, so removing it cannot disconnect anything. That
+      // skips essentially every tile in the open desert and turns an 8-second scan into a fast
+      // one, without weakening the guarantee — the prune only ever rules out non-cut tiles.
+      if (!couldBeAChokepoint(map, bx, by)) continue;
+
+      const start = walkable.find(([x, y]) => !(x === bx && y === by))!;
+      const open = (x: number, y: number) => isWalkable(map, x, y) && !(x === bx && y === by);
+
+      const seen = new Set<string>([`${start[0]},${start[1]}`]);
+      const queue: Array<[number, number]> = [start];
+      for (let head = 0; head < queue.length; head++) {
+        const [x, y] = queue[head]!;
+        for (const [dx, dy] of NEIGHBOURS) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const key = `${nx},${ny}`;
+          if (seen.has(key) || !open(nx, ny)) continue;
+          seen.add(key);
+          queue.push([nx, ny]);
+        }
+      }
+      worst = Math.max(worst, walkable.length - 1 - seen.size);
+    }
+
+    return { cut: worst, walkable: walkable.length };
   }
 
-  const passableExcept = (map: GameMapData, blocked: Point) => (x: number, y: number) =>
-    isWalkable(map, x, y) && !(x === blocked.x && y === blocked.y);
+  /** True when the tile's walkable neighbours come in two or more separate runs around it. */
+  function couldBeAChokepoint(map: GameMapData, x: number, y: number): boolean {
+    const ring = RING.map(([dx, dy]) => isWalkable(map, x + dx, y + dy));
+    let runs = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const previous = ring[(i + ring.length - 1) % ring.length];
+      if (ring[i] && !previous) runs++;
+    }
+    return runs >= 2;
+  }
 
-  it('the causeway really is a single-tile chokepoint', () => {
-    const map = overworld();
-    expect(getTileId(map, CAUSEWAY.x, CAUSEWAY.y)).toBe('path');
-    // Hemmed in by water on both sides: there is no way round it.
-    expect(isWalkable(map, CAUSEWAY.x, CAUSEWAY.y - 1)).toBe(false);
-    expect(isWalkable(map, CAUSEWAY.x, CAUSEWAY.y + 1)).toBe(false);
+  /** The eight neighbours in circular order, so consecutive entries are adjacent to each other. */
+  const RING = [
+    [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1],
+  ] as const;
+
+  const NEIGHBOURS = [
+    [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
+  ] as const;
+
+  // Only the shipped seed: this is O(walkable squared) and one map is enough to catch a
+  // regression in the generator's tuning.
+  it('blocking any one tile strands only a pocket, never a continent', () => {
+    const regions: Record<string, RegionState> = {};
+    const map = ensureRegionLoaded(regions, 'overworld').map;
+
+    const { cut, walkable } = worstSingleTileCut(map);
+
+    expect(cut / walkable).toBeLessThan(MAX_CUT_FRACTION);
   });
 
-  it('blocking it genuinely removes the route', () => {
-    const map = overworld();
-    const open = (x: number, y: number) => isWalkable(map, x, y);
+  it('and when something does block the way, the player still sets off toward it', () => {
+    // A one-tile gap in a wall, held by a creature: the click can't reach, so it walks the line.
+    const rows = ['.......', '###.###', '.......', '.......'];
+    const chokepoint = { x: 3, y: 1 };
+    const isPassable = (x: number, y: number) =>
+      isPassableFor(rows)(x, y) && !(x === chokepoint.x && y === chokepoint.y);
+    const goal = { x: 3, y: 0 };
 
-    expect(findPath(OVERWORLD_SPAWN, FAR_SIDE, open)).not.toBeNull();
-    expect(findPath(OVERWORLD_SPAWN, FAR_SIDE, passableExcept(map, CAUSEWAY))).toBeNull();
-  });
+    expect(findPath({ x: 3, y: 3 }, goal, isPassable)).toBeNull();
 
-  it('still sets off toward it, in a straight line, instead of refusing', () => {
-    const map = overworld();
-    const isPassable = passableExcept(map, CAUSEWAY);
-
-    const path = walkableLineToward(OVERWORLD_SPAWN, FAR_SIDE, isPassable);
-
-    expect(path.length).toBeGreaterThan(0);
-    for (const step of path) expect(isPassable(step.x, step.y)).toBe(true);
-    // Closer than where they started, and every step is on the straight line to the target —
-    // no wandering off around the lake.
-    expect(chebyshevDistance(path.at(-1)!, FAR_SIDE)).toBeLessThan(chebyshevDistance(OVERWORLD_SPAWN, FAR_SIDE));
-    const line = new Set(linePoints(OVERWORLD_SPAWN, FAR_SIDE).map((p) => `${p.x},${p.y}`));
-    for (const step of path) expect(line.has(`${step.x},${step.y}`)).toBe(true);
+    // From back down the corridor, you walk up to whatever is holding the gap and stop there.
+    expect(walkableLineToward({ x: 3, y: 3 }, goal, isPassable)).toEqual([{ x: 3, y: 2 }]);
+    // Already nose to nose with it: nowhere closer to stand, so nothing happens.
+    expect(walkableLineToward({ x: 3, y: 2 }, goal, isPassable)).toEqual([]);
   });
 });

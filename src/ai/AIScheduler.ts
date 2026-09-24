@@ -10,18 +10,26 @@ import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedArmor } from '../items/Equipment';
 import {
   BADLY_HURT,
+  narrateBystanderAttack,
   narrateMonsterAttack,
   PLAYER_BADLY_HURT,
   PLAYER_DEATH,
 } from '../narrative/Narration';
+import { areHostile } from '../world/Factions';
+import { isVisible } from '../fov/VisibilityState';
 
 const ALL_DIRECTIONS: readonly Direction[] = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'];
 
 /**
- * Runs every living monster's turn (in the active region) after the player's. v1 AI is
- * deliberately simple: a monster either wanders randomly, or — if its behavior is 'chase' and
- * the player is within its awarenessRadius (a plain distance check, not FOV; see
- * MonsterData.ts) — closes in and attacks once adjacent.
+ * Runs every living monster's turn (in the active region) after the player's.
+ *
+ * A monster looks for the nearest thing its *faction* is hostile to — which may be the player or
+ * may be another monster — within its awarenessRadius (a plain distance check, not FOV; see
+ * MonsterData.ts), closes in, and attacks once adjacent. Otherwise it wanders.
+ *
+ * That the player is just another candidate target is the whole point: two opposed groups on the
+ * same map fight each other with nothing scripting it, whether or not the player is involved or
+ * even present.
  */
 export function runMonsterTurns(state: GameState, rng: RNG): void {
   const region = getActiveRegion(state);
@@ -29,19 +37,73 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
   for (const monster of region.monsters) {
     if (monster.hp <= 0 || state.gameOver) continue;
 
-    const distance = chebyshevDistance(monster, state.player);
-    const isAware = monster.behavior === 'chase' && distance <= monster.awarenessRadius;
-
-    if (isAware && distance === 1) {
-      attackPlayer(monster, state, rng);
-    } else if (isAware) {
-      moveToward(monster, state.player, state, region);
-    } else {
+    const target = findTarget(monster, state, region);
+    if (!target) {
       wander(monster, state, region, rng);
+      continue;
+    }
+
+    if (chebyshevDistance(monster, target) === 1) {
+      if (target === state.player) attackPlayer(monster, state, rng);
+      else attackMonster(monster, target as Monster, state, region, rng);
+    } else {
+      moveToward(monster, target, state, region);
     }
   }
 
   region.monsters = region.monsters.filter((m) => m.hp > 0);
+}
+
+/** The nearest hostile thing this monster can be bothered to notice, or null. */
+function findTarget(monster: Monster, state: GameState, region: RegionState): Point | null {
+  if (monster.behavior !== 'chase') return null;
+
+  let best: Point | null = null;
+  let bestDistance = monster.awarenessRadius;
+
+  const candidates: Array<Point & { faction: string; hp: number }> = [state.player, ...region.monsters];
+  for (const candidate of candidates) {
+    if (candidate === monster || candidate.hp <= 0) continue;
+    if (!areHostile(monster.faction, candidate.faction)) continue;
+
+    const distance = chebyshevDistance(monster, candidate);
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * One monster hitting another. Reported only when the player can actually see it happen —
+ * otherwise a distant battle would fill the log with events nobody witnessed.
+ */
+function attackMonster(
+  attacker: Monster,
+  defender: Monster,
+  state: GameState,
+  region: RegionState,
+  rng: RNG,
+): void {
+  const result = resolveMeleeAttack(rng, attacker, defender);
+  const seen =
+    isVisible(region.visibility, attacker.x, attacker.y) || isVisible(region.visibility, defender.x, defender.y);
+
+  if (seen) {
+    addMessage(
+      state,
+      narrateBystanderAttack({
+        attacker: MONSTERS[attacker.defId]?.name ?? 'creature',
+        target: MONSTERS[defender.defId]?.name ?? 'creature',
+        hit: result.hit,
+        killed: defender.hp <= 0,
+        shrugged: result.shrugged,
+        seed: state.turnCount,
+      }),
+    );
+  }
 }
 
 function attackPlayer(monster: Monster, state: GameState, rng: RNG): void {

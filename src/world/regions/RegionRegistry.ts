@@ -38,6 +38,8 @@ export interface RegionDef {
   name: string;
   /** What it feels like to arrive here. Content, like everything else in this table. */
   arrival?: string;
+  /** Open sky: see DAYLIGHT_SIGHT_RADIUS and RegionState.daylight. */
+  daylight?: boolean;
   createState: () => RegionState;
   transitions: RegionTransition[];
 }
@@ -47,14 +49,16 @@ function makeRegionState(
   monsters: Monster[] = [],
   groundItems: GroundItem[] = [],
   npcs: Npc[] = [],
+  daylight = false,
 ): RegionState {
-  return { map, monsters, groundItems, npcs, visibility: createVisibility(map.width, map.height) };
+  return { map, daylight, monsters, groundItems, npcs, visibility: createVisibility(map.width, map.height) };
 }
 
 export const REGIONS: Record<string, RegionDef> = {
   overworld: {
     id: 'overworld',
     name: 'the wilds',
+    daylight: true,
     arrival: 'You climb back into the open air. The wilds stretch away around you.',
     createState: () => {
       // The map arrives with its procedural POIs already decided (see maps/overworld.ts); all
@@ -79,6 +83,7 @@ export const REGIONS: Record<string, RegionDef> = {
             'generalStore',
           ),
         ],
+        true, // open sky
       );
     },
     transitions: [

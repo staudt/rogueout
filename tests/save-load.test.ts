@@ -72,9 +72,12 @@ describe('save/load round trip', () => {
     const after = loadGame(storage)!.regions['overworld']!;
 
     expect(after.map.tiles).toEqual(before.map.tiles);
-    // Fog of war survives: you don't re-explore ground you already walked.
+    // Fog of war survives exactly: you don't re-explore ground you already walked, and ground
+    // you never saw stays dark. (Compared wholesale rather than by sample tile, since under
+    // daylight sight a single far-off coordinate may well be legitimately visible.)
     expect(isExplored(after.visibility, state.player.x, state.player.y)).toBe(true);
-    expect(isExplored(after.visibility, 60, 25)).toBe(false);
+    expect(after.visibility.explored).toEqual(before.visibility.explored);
+    expect(after.visibility.explored.some((seen) => !seen)).toBe(true); // something is still unseen
     expect(after.monsters.map((m) => [m.defId, m.x, m.y])).toContainEqual(['goblin', 30, 12]);
     expect(after.groundItems.map((g) => g.item.defId)).toEqual(before.groundItems.map((g) => g.item.defId));
     expect(after.npcs.map((n) => n.id)).toEqual(before.npcs.map((n) => n.id));

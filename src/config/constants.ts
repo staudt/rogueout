@@ -13,3 +13,10 @@ export const DIAGONAL_CHORD_WINDOW_MS = 45;
 
 /** Delay (ms) between each step of a click-to-travel walk — a brisk, visible walking pace. */
 export const AUTO_TRAVEL_STEP_MS = 90;
+
+/**
+ * How far you can see terrain in the open under a hard sun: far enough that the limit is the
+ * land itself, not the light. Sight is still blocked by anything opaque — a rock ridge hides what
+ * is behind it exactly as a dungeon wall does.
+ */
+export const DAYLIGHT_SIGHT_RADIUS = 60;

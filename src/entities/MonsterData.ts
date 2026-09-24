@@ -1,4 +1,5 @@
 import type { DamagePacket, Resistances } from '../combat/DamageTypes';
+import type { FactionId } from '../world/Factions';
 
 export type MonsterBehavior = 'wander' | 'chase';
 
@@ -16,6 +17,7 @@ export interface MonsterDef {
   /** What it's made of and what it has: drives resistances, decapitation, telepathy, and more. */
   tags: string[];
   resist?: Resistances;
+  faction: FactionId;
   behavior: MonsterBehavior;
   /** Simple distance-check "sight" radius for v1 AI (full FOV-based awareness is a roadmap item). */
   awarenessRadius: number;
@@ -34,6 +36,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
     accuracyBonus: 0,
     damage: [{ type: 'pierce', min: 1, max: 2 }], // teeth
     tags: ['living', 'beast', 'head', 'legs'],
+    faction: 'vermin',
     behavior: 'chase',
     awarenessRadius: 5,
   },
@@ -50,6 +53,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
     damage: [{ type: 'cut', min: 2, max: 4 }], // a crude blade
     tags: ['living', 'humanoid', 'head', 'arms', 'legs', 'sentient'],
     resist: { cut: 0.15 }, // scraps of armour, lashed on
+    faction: 'raiders',
     behavior: 'chase',
     awarenessRadius: 6,
   },
@@ -72,6 +76,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
     damage: [{ type: 'acid', min: 1, max: 3 }],
     tags: ['living', 'mindless', 'amorphous'],
     resist: { pierce: 1, cut: 0.5, bludgeon: 0.25, fire: -1 },
+    faction: 'vermin',
     behavior: 'wander',
     awarenessRadius: 1,
   },

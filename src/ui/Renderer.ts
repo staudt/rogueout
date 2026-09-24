@@ -1,11 +1,15 @@
 import type { GameState } from '../engine/GameState';
 import { getActiveRegion } from '../engine/GameState';
+
 import { MIN_VIEWPORT_COLS, MIN_VIEWPORT_ROWS, TILE_SIZE } from '../config/constants';
 import { getTileId } from '../world/GameMap';
 import { TILES } from '../world/Tile';
 import { isExplored, isVisible } from '../fov/VisibilityState';
+import { canSpot } from '../engine/GameState';
+import { FACTIONS, standingBetween } from '../world/Factions';
 import { ITEMS } from '../items/ItemData';
 import type { Camera } from './Camera';
+import type { Point } from '../utils/geometry';
 
 /** Overlay drawn on explored-but-not-currently-visible ("remembered") tiles to dim them. */
 const REMEMBERED_OVERLAY = 'rgba(0, 0, 0, 0.65)';
@@ -75,6 +79,24 @@ export class Renderer {
     return true;
   }
 
+  /**
+   * Rings a creature in its faction's colour, so who belongs to whom is readable at a glance —
+   * the thing that matters most once two groups are fighting each other on the same screen.
+   * Thicker for anything hostile to the player, so "will this kill me" survives the same glance.
+   * The player's own faction is left unmarked: no point ringing everything.
+   */
+  private drawFactionMark(screen: Point, playerFaction: string, faction: string): void {
+    if (faction === playerFaction) return;
+    const color = FACTIONS[faction]?.color;
+    if (!color) return;
+
+    const width = standingBetween(playerFaction, faction) === 'hostile' ? 2 : 1;
+    const inset = width / 2;
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = width;
+    this.ctx.strokeRect(screen.x + inset, screen.y + inset, TILE_SIZE - width, TILE_SIZE - width);
+  }
+
   render(state: GameState): void {
     const region = getActiveRegion(state);
     this.camera.centerOn(state.player, region.map.width, region.map.height);
@@ -112,8 +134,9 @@ export class Renderer {
       }
     }
 
+    // Items, creatures and people all need to be *picked out*, not merely stood in daylight.
     for (const ground of region.groundItems) {
-      if (!isVisible(region.visibility, ground.x, ground.y)) continue;
+      if (!canSpot(state, ground.x, ground.y)) continue;
       const def = ITEMS[ground.item.defId];
       if (!def) continue;
       const screen = this.camera.worldToScreen(ground.x, ground.y);
@@ -122,15 +145,17 @@ export class Renderer {
     }
 
     for (const npc of region.npcs) {
-      if (!isVisible(region.visibility, npc.x, npc.y)) continue;
+      if (!canSpot(state, npc.x, npc.y)) continue;
       const screen = this.camera.worldToScreen(npc.x, npc.y);
+      this.drawFactionMark(screen, state.player.faction, npc.faction);
       ctx.fillStyle = npc.fg;
       ctx.fillText(npc.glyph, screen.x + 2, screen.y + 2);
     }
 
     for (const monster of region.monsters) {
-      if (!isVisible(region.visibility, monster.x, monster.y)) continue;
+      if (!canSpot(state, monster.x, monster.y)) continue;
       const screen = this.camera.worldToScreen(monster.x, monster.y);
+      this.drawFactionMark(screen, state.player.faction, monster.faction);
       ctx.fillStyle = monster.fg;
       ctx.fillText(monster.glyph, screen.x + 2, screen.y + 2);
     }

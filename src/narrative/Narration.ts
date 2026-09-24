@@ -205,3 +205,43 @@ export function pickPhrase(options: readonly string[], seed: number): string {
 function fill(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole);
 }
+
+const BYSTANDER_HIT: readonly string[] = [
+  'The {attacker} lands a blow on the {target}.',
+  'The {attacker} hits the {target}.',
+  'The {attacker} gets through the {target}\'s guard.',
+];
+
+const BYSTANDER_MISS: readonly string[] = [
+  'The {attacker} lunges at the {target} and misses.',
+  'The {target} slips away from the {attacker}.',
+];
+
+const BYSTANDER_KILL: readonly string[] = [
+  'The {attacker} cuts the {target} down.',
+  'The {target} goes down under the {attacker}.',
+];
+
+const BYSTANDER_SHRUGGED: readonly string[] = ['The {attacker} hits the {target} to no effect.'];
+
+export interface BystanderAttack {
+  attacker: string;
+  target: string;
+  hit: boolean;
+  killed: boolean;
+  shrugged?: boolean;
+  seed: number;
+}
+
+/**
+ * Two other creatures fighting each other — the log's view of a battle the player is only
+ * watching. Kept terser than the player's own combat: a war should read as a war, not bury the
+ * player's own line in other people's blow-by-blow.
+ */
+export function narrateBystanderAttack(attack: BystanderAttack): string {
+  const values = { attacker: attack.attacker, target: attack.target };
+  if (!attack.hit) return fill(pickPhrase(BYSTANDER_MISS, attack.seed), values);
+  if (attack.shrugged) return fill(pickPhrase(BYSTANDER_SHRUGGED, attack.seed), values);
+  if (attack.killed) return fill(pickPhrase(BYSTANDER_KILL, attack.seed), values);
+  return fill(pickPhrase(BYSTANDER_HIT, attack.seed), values);
+}

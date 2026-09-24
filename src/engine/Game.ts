@@ -11,12 +11,12 @@ import type { Npc } from '../entities/Npc';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import { OVERWORLD_SPAWN } from '../world/maps/overworld';
 import { isWalkable } from '../world/GameMap';
-import { isExplored, isVisible } from '../fov/VisibilityState';
+import { isExplored } from '../fov/VisibilityState';
 import { findPath } from '../pathfinding/BFS';
 import { walkableLineToward } from '../pathfinding/StraightLine';
 import { AutoTravel } from '../pathfinding/AutoTravel';
 import type { GameState, RegionState } from './GameState';
-import { addMessage, getActiveRegion } from './GameState';
+import { addMessage, canSpot, getActiveRegion } from './GameState';
 import { EventBus, type GameEvents } from './EventBus';
 import { TurnManager } from './TurnManager';
 import { InputManager, type ActionKey } from '../input/InputManager';
@@ -355,13 +355,13 @@ export class Game {
   private visibleEntities(region: RegionState): Map<string, string> {
     const entities = new Map<string, string>();
     for (const m of region.monsters) {
-      if (m.hp > 0 && isVisible(region.visibility, m.x, m.y)) {
+      if (m.hp > 0 && canSpot(this.state, m.x, m.y)) {
         entities.set(`m:${m.id}`, withArticle(MONSTERS[m.defId]?.name ?? 'creature'));
       }
     }
     for (const n of region.npcs) {
       // NPCs have proper names, so no article: "You see Old Maren.", not "a Old Maren".
-      if (isVisible(region.visibility, n.x, n.y)) entities.set(`n:${n.id}`, n.name);
+      if (canSpot(this.state, n.x, n.y)) entities.set(`n:${n.id}`, n.name);
     }
     return entities;
   }

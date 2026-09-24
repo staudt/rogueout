@@ -31,3 +31,15 @@ export function computeCarryCapacity(strength: number): number {
 export function computeFovRadius(perception: number): number {
   return 6 + Math.floor(perception / 3);
 }
+
+/**
+ * How far off a *creature* can be picked out, as opposed to bare terrain.
+ *
+ * Daylight would otherwise reveal every monster on the map from the first turn, which both kills
+ * the point of exploring and quietly disables the danger-interrupt on auto-travel (nothing is
+ * ever *newly* seen). Seeing a long way and being able to tell what that speck is are different
+ * problems — and this is the job Perception keeps out in the open.
+ */
+export function computeSpotRadius(perception: number): number {
+  return computeFovRadius(perception) * 2;
+}

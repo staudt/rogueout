@@ -6,6 +6,7 @@ import { combineResistances, type DamagePacket } from '../combat/DamageTypes';
 import type { Inventory } from '../items/Inventory';
 import { createEmptyEquipment, type Equipment } from '../items/Equipment';
 import { ITEMS } from '../items/ItemData';
+import { PLAYER_FACTION, type FactionId } from '../world/Factions';
 
 /** Fists: a bludgeon, and a poor one. */
 export const UNARMED_DAMAGE: DamagePacket[] = [{ type: 'bludgeon', min: 1, max: 2 }];
@@ -19,6 +20,7 @@ export interface Player extends Entity, Combatant {
   inventory: Inventory;
   equipment: Equipment;
   gold: number;
+  faction: FactionId;
 }
 
 export function createPlayer(x: number, y: number, special: SpecialStats = DEFAULT_SPECIAL): Player {
@@ -43,6 +45,7 @@ export function createPlayer(x: number, y: number, special: SpecialStats = DEFAU
     inventory: [],
     equipment: createEmptyEquipment(),
     gold: 15,
+    faction: PLAYER_FACTION,
   };
 }
 

@@ -3,6 +3,7 @@ import { reserveItemInstanceIds } from '../items/Item';
 import { reserveMonsterInstanceIds } from '../entities/Monster';
 import type { SaveStorage } from './LocalStorageAdapter';
 import { fromSaveData, migrate, toSaveData, type SaveData } from './SaveSchema';
+import { REGIONS } from '../world/regions/RegionRegistry';
 
 /**
  * Single-slot save/load.
@@ -33,6 +34,13 @@ export function loadGame(storage: SaveStorage): GameState | null {
 
   const state = fromSaveData(save);
   reserveInstanceIds(save);
+
+  // Saves written before regions knew about daylight would otherwise load the overworld as if it
+  // were underground. Cheaper and safer than a schema bump for a field the region table owns.
+  for (const [id, region] of Object.entries(state.regions)) {
+    region.daylight ??= REGIONS[id]?.daylight ?? false;
+  }
+
   return state;
 }
 

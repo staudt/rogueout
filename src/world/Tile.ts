@@ -17,16 +17,16 @@ export const TILES: Record<string, TileDef> = {
   // Wilderness terrain (M6, produced by world/generation/*). Glyphs are picked to not collide with
   // any item glyph (`)`, `[`, `!`) or monster glyph (lowercase letters), so a tile is never
   // mistakable for something standing on it.
-  sand: { id: 'sand', glyph: ',', fg: '#c2a76a', bg: '#000000', walkable: true, opaque: false },
-  grass: { id: 'grass', glyph: '"', fg: '#4c9a4c', bg: '#000000', walkable: true, opaque: false },
+  sand: { id: 'sand', glyph: ',', fg: '#c2a76a', bg: '#171208', walkable: true, opaque: false },
+  grass: { id: 'grass', glyph: '"', fg: '#4c9a4c', bg: '#0c1408', walkable: true, opaque: false },
   /**
    * The stitched town->dungeon road: always walkable, whatever terrain the noise put there.
    * Deliberately the only `.` out in the wilds (sand is `,`) so the road reads as a road.
    */
-  path: { id: 'path', glyph: '.', fg: '#cdbb92', bg: '#000000', walkable: true, opaque: false },
-  water: { id: 'water', glyph: '~', fg: '#3f7fbf', bg: '#000000', walkable: false, opaque: false },
-  rock: { id: 'rock', glyph: '*', fg: '#7a7a7a', bg: '#000000', walkable: false, opaque: true },
-  tree: { id: 'tree', glyph: 'T', fg: '#2f7d32', bg: '#000000', walkable: false, opaque: true },
+  path: { id: 'path', glyph: '.', fg: '#cdbb92', bg: '#1f1810', walkable: true, opaque: false },
+  water: { id: 'water', glyph: '~', fg: '#3f7fbf', bg: '#06101a', walkable: false, opaque: false },
+  rock: { id: 'rock', glyph: '*', fg: '#7a7a7a', bg: '#121212', walkable: false, opaque: true },
+  tree: { id: 'tree', glyph: 'T', fg: '#2f7d32', bg: '#0c1408', walkable: false, opaque: true },
 };
 
 export const DEFAULT_TILE_ID = 'wall';
