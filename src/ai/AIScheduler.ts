@@ -29,10 +29,10 @@ import {
   type Provokable,
 } from './Actors';
 import { narrateDistantFighting } from '../narrative/Shouts';
+import { hearsFighting } from './Hearing';
 import {
   DETOUR_NODE_BUDGET,
   MAX_ACTIONS_PER_TURN,
-  HEARING_RADIUS,
   NORMAL_SPEED,
   SCAVENGE_RADIUS,
 } from '../config/constants';
@@ -272,7 +272,7 @@ function attackTarget(
         seed: state.turnCount,
       }),
     );
-  } else if (chebyshevDistance(state.player, defender) <= HEARING_RADIUS) {
+  } else if (hearsFighting(state.player, defender)) {
     addMessage(state, narrateDistantFighting(state.player, defender));
   }
 

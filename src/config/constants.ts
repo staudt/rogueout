@@ -69,8 +69,15 @@ export const DEFAULT_THROW_BONUS = -20;
 /** How much worse a boot is than a hand at aiming a loose object. */
 export const KICK_ACCURACY_PENALTY = 20;
 
-/** How far a scream carries. Further than sight, and walls don't stop it. */
-export const ALARM_RADIUS = 14;
+/**
+ * How far a deliberate shout carries, and therefore who reacts to one. Walls don't stop it —
+ * hearing round a corner is the point of shouting.
+ *
+ * Comfortably beyond `computeSpotRadius` (about 14 at average Perception), because the band where
+ * a fight is *audible and illegible* is the whole idea; too close together and nobody would ever
+ * experience it. Not much beyond, either: this is a wasteland, and it should feel like one.
+ */
+export const SHOUT_RADIUS = 24;
 
 /**
  * How close you have to be for trouble to be *your* business, if going looking isn't your job.
@@ -84,12 +91,5 @@ export const CORPSE_NOTICE_RADIUS = 3;
 /** How far a scavenger will go out of its way for something lying on the ground. */
 export const SCAVENGE_RADIUS = 8;
 
-/**
- * How far the noise of a fight carries.
- *
- * Deliberately far larger than `computeSpotRadius` (about 14 for average Perception). Sound
- * beating sight by a couple of tiles would make "you hear fighting somewhere east" a thing you
- * essentially never saw; at this range there's a wide band of the map where a war is audible and
- * illegible, which is the point.
- */
-export const HEARING_RADIUS = 34;
+/** The noise of a fight. Shorter than a shout: nobody in it is trying to be heard. */
+export const FIGHT_NOISE_RADIUS = 16;

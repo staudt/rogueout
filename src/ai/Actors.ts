@@ -6,13 +6,8 @@ import { addMessage, canSpot } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { chebyshevDistance, type Point } from '../utils/geometry';
 import { FACTIONS, standingBetween, type FactionId } from '../world/Factions';
-import {
-  ALERT_RADIUS,
-  ALARM_RADIUS,
-  CORPSE_NOTICE_RADIUS,
-  HEARING_RADIUS,
-  WITNESS_RADIUS,
-} from '../config/constants';
+import { ALERT_RADIUS, CORPSE_NOTICE_RADIUS, SHOUT_RADIUS, WITNESS_RADIUS } from '../config/constants';
+import { hearsShout, withinEarshot } from './Hearing';
 import { narrateDistantShout, narrateShout } from '../narrative/Shouts';
 
 /**
@@ -112,7 +107,7 @@ export function raiseAlarm(
   at: Point,
   screamerFaction: FactionId,
   offender: FactionId,
-  radius: number = ALARM_RADIUS,
+  radius: number = SHOUT_RADIUS,
 ): void {
   // Carried with the errand so that whoever turns up knows what they're looking at. Deciding on
   // arrival rather than from earshot is the difference between a witness and a telepath.
@@ -120,7 +115,7 @@ export function raiseAlarm(
   for (const listener of [...region.monsters, ...region.npcs]) {
     if (listener.hp <= 0) continue;
     if (listener.faction === offender) continue;
-    if (chebyshevDistance(listener, at) > radius) continue;
+    if (!withinEarshot(listener, at, radius)) continue;
 
     if (standingBetween(listener.faction, screamerFaction) === 'friendly') {
       provoke(listener, offender);
@@ -131,7 +126,7 @@ export function raiseAlarm(
     if (listener.investigating) continue;
 
     const goesLooking =
-      FACTIONS[listener.faction]?.keepsOrder || chebyshevDistance(listener, at) <= WITNESS_RADIUS;
+      FACTIONS[listener.faction]?.keepsOrder || withinEarshot(listener, at, WITNESS_RADIUS);
     // Curious, not committed. They'll form an opinion when they get there.
     if (goesLooking) listener.investigating = { ...context };
   }
@@ -170,7 +165,7 @@ export function reactToAttack(
   victim.hasScreamed = true;
   raiseAlarm(region, victim, victim.faction, offender);
 
-  if (chebyshevDistance(state.player, victim) <= ALARM_RADIUS) {
+  if (hearsShout(state.player, victim)) {
     addMessage(state, `${actorLabel(victim)} shouts for help.`.replace(/^./, (c) => c.toUpperCase()));
   }
 }
@@ -266,7 +261,7 @@ export function callOutEnemy(
   // over a ridge ever is.
   if (canSpot(state, spotter.x, spotter.y)) {
     addMessage(state, narrateShout(spotter.faction, enemyFaction, state.turnCount));
-  } else if (chebyshevDistance(state.player, spotter) <= HEARING_RADIUS) {
+  } else if (hearsShout(state.player, spotter)) {
     addMessage(state, narrateDistantShout(state.player, spotter, state.turnCount));
   }
 }
