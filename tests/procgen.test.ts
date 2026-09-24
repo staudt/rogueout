@@ -15,7 +15,7 @@ import {
   OVERWORLD_DUNGEON_ENTRANCE,
   OVERWORLD_HERB_POS,
   OVERWORLD_SEED,
-  OVERWORLD_SHOPKEEPER_POS,
+  OVERWORLD_STORE_DOOR,
   OVERWORLD_SPAWN,
   OVERWORLD_SPAWN_FROM_DUNGEON,
 } from '../src/world/maps/overworld';
@@ -200,9 +200,13 @@ describe('generated overworld', () => {
   it('keeps the handcrafted town intact', () => {
     const { map } = generateOverworld();
     expect(isWalkable(map, OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y)).toBe(true);
-    expect(isWalkable(map, OVERWORLD_SHOPKEEPER_POS.x, OVERWORLD_SHOPKEEPER_POS.y)).toBe(true);
     expect(isWalkable(map, OVERWORLD_HERB_POS.x, OVERWORLD_HERB_POS.y)).toBe(true);
-    expect(getTileId(map, 11, 6)).toBe('floor'); // the shop door
+
+    // The store is a solid block with one real door; its inside is a separate region.
+    expect(getTileId(map, OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y)).toBe('door');
+    expect(isWalkable(map, OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y)).toBe(true);
+    expect(isWalkable(map, 12, 6)).toBe(false);
+    expect(isWalkable(map, 13, 6)).toBe(false);
   });
 
   it('walls off the edge of the world', () => {
@@ -227,7 +231,7 @@ describe('generated overworld', () => {
 
       expect(reached.has(`${OVERWORLD_DUNGEON_ENTRANCE.x},${OVERWORLD_DUNGEON_ENTRANCE.y}`)).toBe(true);
       expect(reached.has(`${OVERWORLD_SPAWN_FROM_DUNGEON.x},${OVERWORLD_SPAWN_FROM_DUNGEON.y}`)).toBe(true);
-      expect(reached.has(`${OVERWORLD_SHOPKEEPER_POS.x},${OVERWORLD_SHOPKEEPER_POS.y}`)).toBe(true);
+      expect(reached.has(`${OVERWORLD_STORE_DOOR.x},${OVERWORLD_STORE_DOOR.y}`)).toBe(true);
 
       for (const poi of pois) {
         expect(reached.has(`${poi.x},${poi.y}`)).toBe(true);

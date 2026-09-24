@@ -3,6 +3,7 @@ import type { Player } from '../entities/Player';
 import type { Monster } from '../entities/Monster';
 import type { Npc } from '../entities/Npc';
 import type { GroundItem } from '../items/Item';
+import type { RegionTransition } from '../world/regions/RegionTypes';
 import { decodeBits, decodeTiles, encodeBits, encodeTiles, type EncodedTiles } from './MapCodec';
 
 /**
@@ -29,6 +30,10 @@ export const SAVED_MESSAGE_LINES = 50;
  *   to recalculate anyway — and it was the single largest field in the file.
  */
 export interface SavedRegion {
+  name: string;
+  arrival?: string;
+  /** Including any `create` recipe, which is how an unentered interior survives a reload. */
+  transitions: RegionTransition[];
   map: { width: number; height: number; tiles: EncodedTiles };
   daylight: boolean;
   patrolRoute?: Array<{ x: number; y: number }>;
@@ -64,6 +69,9 @@ export function toSaveData(state: GameState): SaveData {
 
   for (const [id, region] of Object.entries(state.regions)) {
     regions[id] = {
+      name: region.name,
+      ...(region.arrival ? { arrival: region.arrival } : {}),
+      transitions: region.transitions,
       map: {
         width: region.map.width,
         height: region.map.height,
@@ -109,6 +117,9 @@ export function fromSaveData(save: SaveData): GameState | null {
     if (!explored) return null;
 
     regions[id] = {
+      name: saved.name,
+      ...(saved.arrival ? { arrival: saved.arrival } : {}),
+      transitions: saved.transitions ?? [],
       map: { width, height, tiles },
       daylight: saved.daylight,
       ...(saved.patrolRoute ? { patrolRoute: saved.patrolRoute } : {}),
@@ -195,6 +206,7 @@ function isRegionShaped(region: Record<string, unknown>): boolean {
 
   if (typeof region['explored'] !== 'string') return false;
   if (typeof region['daylight'] !== 'boolean') return false;
+  if (typeof region['name'] !== 'string' || !Array.isArray(region['transitions'])) return false;
 
   return Array.isArray(region['monsters']) && Array.isArray(region['groundItems']) && Array.isArray(region['npcs']);
 }

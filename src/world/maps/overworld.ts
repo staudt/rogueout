@@ -39,7 +39,12 @@ const HEIGHT = 30;
 export const OVERWORLD_SEED = 20260923;
 
 export const OVERWORLD_SPAWN = { x: 5, y: 15 };
-export const OVERWORLD_SHOPKEEPER_POS = { x: 12, y: 6 };
+/**
+ * The store's doorway. The building behind it is a solid block: its inside is a separate region,
+ * reached by standing here and pressing `>`. That's the shape every city building will have, so
+ * the desert's one shop is where the machinery gets proven.
+ */
+export const OVERWORLD_STORE_DOOR = { x: 11, y: 6 };
 export const OVERWORLD_HERB_POS = { x: 8, y: 9 };
 export const OVERWORLD_DUNGEON_ENTRANCE = { x: 65, y: 15 };
 export const OVERWORLD_SPAWN_FROM_DUNGEON = { x: 63, y: 15 };
@@ -112,14 +117,14 @@ function buildTown(map: GameMapData): void {
     }
   }
 
-  // The general store — the only "building" for now; more towns/structures land as more content.
-  for (let x = 11; x <= 14; x++) {
-    setTileId(map, x, 5, 'wall');
-    setTileId(map, x, 7, 'wall');
-  }
+  // The general store. Stamped *solid* rather than hollow: what's inside is its own region, and
+  // the only thing on this map that belongs to it is the door. Buildings whose interiors are
+  // curated rather than generated can all be solid masses, which is what keeps a city generator
+  // tractable — there are no accidental interiors to seal, only rooms somebody authored.
   for (let y = 5; y <= 7; y++) {
-    setTileId(map, 11, y, 'wall');
-    setTileId(map, 14, y, 'wall');
+    for (let x = 11; x <= 14; x++) {
+      setTileId(map, x, y, 'wall');
+    }
   }
-  setTileId(map, 11, 6, 'floor'); // door
+  setTileId(map, OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y, 'door');
 }

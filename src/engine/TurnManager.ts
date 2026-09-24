@@ -3,7 +3,7 @@ import { addMessage, getActiveRegion } from './GameState';
 import { EventBus, type GameEvents } from './EventBus';
 import { addPoints, DIRECTION_VECTORS, type Direction } from '../utils/geometry';
 import { getTileId, isOpaque, isWalkable } from '../world/GameMap';
-import { stairwayDirection, type StairwayDirection } from '../world/Tile';
+import { isDeliberateTransition, transitionKind, type StairwayDirection, type TransitionKind } from '../world/Tile';
 import { computeFOV } from '../fov/Shadowcasting';
 import { markVisible, resetVisible } from '../fov/VisibilityState';
 import { computeFovRadius } from '../combat/CombatFormulas';
@@ -16,7 +16,8 @@ import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedWeapon } from '../items/Equipment';
 import { ITEMS } from '../items/ItemData';
 import { runMonsterTurns, runNpcTurns } from '../ai/AIScheduler';
-import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
+import { ensureRegionLoaded } from '../world/regions/RegionRegistry';
+import type { RegionTransition } from '../world/regions/RegionTypes';
 import { areHostile } from '../world/Factions';
 import { actorLabel, reactToAttack, removeActor, type Provokable } from '../ai/Actors';
 import type { RNG } from '../utils/RNG';
@@ -32,6 +33,7 @@ import {
 const TILE_ANNOUNCEMENTS: Partial<Record<string, string>> = {
   stairsDown: 'Stairs down. Press > to descend.',
   stairsUp: 'Stairs up. Press < to climb.',
+  door: 'A door. Press > to go through.',
 };
 
 export class TurnManager {
@@ -88,8 +90,8 @@ export class TurnManager {
     // on the step itself, since there's nothing to decide. This is also what keeps auto-travel
     // from dropping you into a dungeon just because the path crossed the entrance.
     const transition = this.transitionAt(target.x, target.y);
-    if (transition && !stairwayDirection(getTileId(region.map, target.x, target.y))) {
-      this.crossTransition(transition.toRegion, transition.spawnX, transition.spawnY);
+    if (transition && !isDeliberateTransition(getTileId(region.map, target.x, target.y))) {
+      this.crossTransition(transition);
       this.state.turnCount += 1;
       this.events.emit('turn-ended', { turnCount: this.state.turnCount });
       return true;
@@ -101,28 +103,32 @@ export class TurnManager {
   }
 
   /**
-   * `>` / `<`: takes the staircase under the player. Returns false (no turn consumed) if there
-   * isn't one leading that way, so a mistyped key costs nothing.
+   * `>` / `<`: takes the staircase or door under the player. Returns false (no turn consumed) if
+   * there isn't one leading that way, so a mistyped key costs nothing.
+   *
+   * A doorway answers to *both* keys. There is only ever one transition on a tile, so there's
+   * nothing to disambiguate, and making the player remember which side of a door they're on would
+   * be friction with no decision behind it.
    */
-  useStairs(direction: StairwayDirection): boolean {
+  useTransition(direction: StairwayDirection): boolean {
     if (this.state.gameOver) return false;
 
     const region = getActiveRegion(this.state);
     const { x, y } = this.state.player;
-    const here = stairwayDirection(getTileId(region.map, x, y));
+    const here = transitionKind(getTileId(region.map, x, y));
 
-    if (here !== direction) {
+    if (here === null || (here !== 'door' && here !== direction)) {
       addMessage(this.state, `There is no staircase leading ${direction} here.`);
       return false;
     }
 
     const transition = this.transitionAt(x, y);
     if (!transition) {
-      addMessage(this.state, 'The staircase is blocked.');
+      addMessage(this.state, here === 'door' ? 'The door will not open.' : 'The staircase is blocked.');
       return false;
     }
 
-    this.crossTransition(transition.toRegion, transition.spawnX, transition.spawnY);
+    this.crossTransition(transition);
     this.state.turnCount += 1;
     this.events.emit('turn-ended', { turnCount: this.state.turnCount });
     return true;
@@ -135,14 +141,18 @@ export class TurnManager {
     this.advanceTurn();
   }
 
-  /** The staircase under the player, if any — used to keep the command menu contextual. */
-  stairwayUnderPlayer(): StairwayDirection | null {
+  /** The crossing under the player, if any — used to keep the command menu contextual. */
+  transitionUnderPlayer(): TransitionKind | null {
     const region = getActiveRegion(this.state);
-    return stairwayDirection(getTileId(region.map, this.state.player.x, this.state.player.y));
+    return transitionKind(getTileId(region.map, this.state.player.x, this.state.player.y));
   }
 
-  private transitionAt(x: number, y: number) {
-    return REGIONS[this.state.activeRegionId]?.transitions.find((t) => t.x === x && t.y === y);
+  /**
+   * Read off the *region's state*, not a static table: a generated interior's doorways aren't
+   * known until it's built, and they have to survive a reload.
+   */
+  private transitionAt(x: number, y: number): RegionTransition | undefined {
+    return getActiveRegion(this.state).transitions.find((t) => t.x === x && t.y === y);
   }
 
   /** Recomputes the visible set from the player's current position/region. Call once at startup too. */
@@ -172,13 +182,19 @@ export class TurnManager {
     this.events.emit('turn-ended', { turnCount: this.state.turnCount });
   }
 
-  private crossTransition(toRegion: string, spawnX: number, spawnY: number): void {
-    ensureRegionLoaded(this.state.regions, toRegion);
-    this.state.activeRegionId = toRegion;
-    this.state.player.x = spawnX;
-    this.state.player.y = spawnY;
-    const def = REGIONS[toRegion];
-    addMessage(this.state, def?.arrival ?? `You enter ${def?.name ?? toRegion}.`);
+  private crossTransition(transition: RegionTransition): void {
+    // The recipe rides on the transition, which is what lets somewhere with no entry in REGIONS —
+    // a building's interior, a stretch of tunnel — be built the first time you open the door to it.
+    const region = ensureRegionLoaded(this.state.regions, transition.toRegion, transition.create);
+    this.state.activeRegionId = transition.toRegion;
+    this.state.player.x = transition.spawnX;
+    this.state.player.y = transition.spawnY;
+
+    // Crossings that stand in for distance cost time. Charging turns for the blocks a city elides
+    // is honest, and cheaper than modelling a quarter mile of identical rubble.
+    if (transition.turnCost) this.state.turnCount += transition.turnCost;
+
+    addMessage(this.state, transition.announce ?? region.arrival ?? `You enter ${region.name}.`);
     this.recomputeFOV();
     this.announceTileContents();
   }

@@ -23,7 +23,7 @@ function region(): RegionState {
   for (let y = 1; y < 13; y++) for (let x = 1; x < 29; x++) setTileId(map, x, y, 'floor');
   const visibility = createVisibility(30, 14);
   for (let y = 0; y < 14; y++) for (let x = 0; x < 30; x++) markVisible(visibility, x, y);
-  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 }
 
 function stateFor(r: RegionState): GameState {

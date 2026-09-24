@@ -14,7 +14,7 @@ import { MONSTERS } from '../entities/MonsterData';
 import { addItem, consumeOne, removeItem } from '../items/Inventory';
 import { SHOPS } from '../world/ShopData';
 import type { Npc } from '../entities/Npc';
-import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
+import { ensureRegionLoaded } from '../world/regions/RegionRegistry';
 import { OVERWORLD_SPAWN } from '../world/maps/overworld';
 import { isWalkable } from '../world/GameMap';
 import { isExplored } from '../fov/VisibilityState';
@@ -480,11 +480,11 @@ export class Game {
         this.render();
         break;
       case '>':
-        this.turnManager.useStairs('down');
+        this.turnManager.useTransition('down');
         this.render();
         break;
       case '<':
-        this.turnManager.useStairs('up');
+        this.turnManager.useTransition('up');
         this.render();
         break;
       case 'C':
@@ -746,9 +746,11 @@ export class Game {
       const name = ITEMS[groundItem.item.defId]?.name ?? 'item';
       options.push({ label: `Pick up ${name}`, value: 'pickup', hint: '[,]' });
     }
-    const stairway = this.turnManager.stairwayUnderPlayer();
-    if (stairway === 'down') options.push({ label: 'Descend the staircase', value: 'descend', hint: '[>]' });
-    if (stairway === 'up') options.push({ label: 'Climb the staircase', value: 'climb', hint: '[<]' });
+    const crossing = this.turnManager.transitionUnderPlayer();
+    if (crossing === 'down') options.push({ label: 'Descend the staircase', value: 'descend', hint: '[>]' });
+    if (crossing === 'up') options.push({ label: 'Climb the staircase', value: 'climb', hint: '[<]' });
+    // A door takes either key, so offer the one entry rather than making the player pick a verb.
+    if (crossing === 'door') options.push({ label: 'Go through the door', value: 'descend', hint: '[>]' });
 
     options.push(
       { label: 'Inventory', value: 'inventory', hint: '[i]' },
@@ -787,12 +789,12 @@ export class Game {
         break;
       case 'descend':
         this.screens.closeAll();
-        this.turnManager.useStairs('down');
+        this.turnManager.useTransition('down');
         this.render();
         break;
       case 'climb':
         this.screens.closeAll();
-        this.turnManager.useStairs('up');
+        this.turnManager.useTransition('up');
         this.render();
         break;
       case 'wait':
@@ -1214,7 +1216,7 @@ export class Game {
         '',
         `You survived ${this.state.turnCount} turns.`,
         `Caps carried: ${player.caps}`,
-        `Fell in: ${REGIONS[this.state.activeRegionId]?.name ?? this.state.activeRegionId}`,
+        `Fell in: ${getActiveRegion(this.state).name}`,
         '',
       ],
       options: [{ label: 'New game', value: 'new-game' }],

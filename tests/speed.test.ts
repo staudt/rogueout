@@ -15,7 +15,7 @@ function arena(width = 30, height = 7): RegionState {
   for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) setTileId(map, x, y, 'floor');
   const visibility = createVisibility(width, height);
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) markVisible(visibility, x, y);
-  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 }
 
 function chaseState(speed: number | undefined, startX: number): { state: GameState; hunter: ReturnType<typeof createMonster> } {

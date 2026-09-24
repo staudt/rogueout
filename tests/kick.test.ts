@@ -14,7 +14,7 @@ function arena(width = 20, height = 9): RegionState {
   for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) setTileId(map, x, y, 'floor');
   const visibility = createVisibility(width, height);
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) markVisible(visibility, x, y);
-  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 }
 
 function stateFor(region: RegionState, x = 2, y = 4): GameState {

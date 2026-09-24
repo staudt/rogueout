@@ -16,7 +16,7 @@ function town(width = 40, height = 20): RegionState {
   for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) setTileId(map, x, y, 'floor');
   const visibility = createVisibility(width, height);
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) markVisible(visibility, x, y);
-  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 }
 
 function stateFor(region: RegionState, x = 2, y = 2): GameState {
@@ -270,7 +270,7 @@ describe('giving up on an errand', () => {
     for (let y = 1; y < 6; y++) for (let x = 9; x < 13; x++) setTileId(map, x, y, 'floor');
     const visibility = createVisibility(14, 7);
     for (let y = 0; y < 7; y++) for (let x = 0; x < 14; x++) markVisible(visibility, x, y);
-    const region: RegionState = { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+    const region: RegionState = { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 
     const trooper = createMonster(MONSTERS['restorationTrooper']!, 2, 3);
     region.monsters.push(trooper);

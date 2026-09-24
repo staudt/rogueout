@@ -1,7 +1,6 @@
-import type { GameState } from '../engine/GameState';
+import { getActiveRegion, type GameState } from '../engine/GameState';
 import { ITEMS } from '../items/ItemData';
 import type { Item } from '../items/Item';
-import { REGIONS } from '../world/regions/RegionRegistry';
 
 /** Below which fraction of max HP the readout turns red. */
 const LOW_HP_FRACTION = 1 / 3;
@@ -58,7 +57,7 @@ export function statusFields(state: GameState): Field[] {
     { label: 'Caps', value: String(player.caps) },
     { label: 'Weapon', value: describeEquipped(player.equipment.weapon) },
     { label: 'Armor', value: describeEquipped(player.equipment.armor) },
-    { label: '', value: REGIONS[state.activeRegionId]?.name ?? state.activeRegionId },
+    { label: '', value: getActiveRegion(state).name },
     { label: 'Turn', value: String(state.turnCount) },
   ];
 }

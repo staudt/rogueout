@@ -1,9 +1,8 @@
-import type { GameState } from '../../engine/GameState';
+import { getActiveRegion, type GameState } from '../../engine/GameState';
 import { ITEMS } from '../../items/ItemData';
 import type { Item } from '../../items/Item';
 import { computeCarryCapacity, computeFovRadius, computeToHitChance } from '../../combat/CombatFormulas';
 import type { DamagePacket, Resistances } from '../../combat/DamageTypes';
-import { REGIONS } from '../../world/regions/RegionRegistry';
 
 /** AC the displayed hit chance is quoted against — an unarmored, average-agility target. */
 const REFERENCE_AC = 10;
@@ -37,7 +36,7 @@ export function describeCharacter(state: GameState): string[] {
   ].map(([label, value]) => `${label!.padEnd(12)}${value}`);
 
   const lines = [
-    `${REGIONS[state.activeRegionId]?.name ?? state.activeRegionId} — turn ${state.turnCount}`,
+    `${getActiveRegion(state).name} — turn ${state.turnCount}`,
     '',
     `HP ${player.hp}/${player.maxHp}    AC ${player.ac}    Caps ${player.caps}`,
     '',

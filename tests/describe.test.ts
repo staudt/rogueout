@@ -12,7 +12,7 @@ import type { GameState, RegionState } from '../src/engine/GameState';
 function region(): RegionState {
   const map = createGameMap(12, 8, 'wall');
   for (let y = 1; y < 7; y++) for (let x = 1; x < 11; x++) setTileId(map, x, y, 'sand');
-  return { map, daylight: true, monsters: [], groundItems: [], npcs: [], visibility: createVisibility(12, 8) };
+  return { map, daylight: true, monsters: [], groundItems: [], npcs: [], visibility: createVisibility(12, 8), name: 'test arena', transitions: [] };
 }
 
 function state(r: RegionState): GameState {

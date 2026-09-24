@@ -22,7 +22,7 @@ export const HELP_LINES: readonly string[] = [
   '  k                 kick (knocks light things back; blunt, whatever you hold)',
   '  F                 attack on purpose, even someone peaceful',
   '  f                 fire (no ranged weapons yet)',
-  '  > / <             descend / climb a staircase',
+  '  > / <             descend / climb a staircase, or go through a door',
   '',
   'SCREENS',
   '  ;                 look at something (cursor or click)',

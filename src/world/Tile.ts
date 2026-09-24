@@ -13,6 +13,12 @@ export const TILES: Record<string, TileDef> = {
   wall: { id: 'wall', glyph: '#', fg: '#a85a32', bg: '#000000', walkable: false, opaque: true },
   stairsDown: { id: 'stairsDown', glyph: '>', fg: '#ffff00', bg: '#000000', walkable: true, opaque: false },
   stairsUp: { id: 'stairsUp', glyph: '<', fg: '#ffff00', bg: '#000000', walkable: true, opaque: false },
+  /**
+   * A way into a building. Walkable *and opaque*: you should not be able to read a shop's interior
+   * off the street through its doorway. FOV always marks the viewer's own tile visible, so standing
+   * in the doorway still works — you just have to be in it.
+   */
+  door: { id: 'door', glyph: '+', fg: '#c98b3a', bg: '#1a1208', walkable: true, opaque: true },
 
   // Wilderness terrain (M6, produced by world/generation/*). Glyphs are picked to not collide with
   // any item glyph (`)`, `[`, `!`) or monster glyph (lowercase letters), so a tile is never
@@ -33,14 +39,27 @@ export const DEFAULT_TILE_ID = 'wall';
 
 export type StairwayDirection = 'down' | 'up';
 
+/** What kind of deliberate crossing a tile offers. A door answers to both `>` and `<`. */
+export type TransitionKind = StairwayDirection | 'door';
+
 /**
- * Which way a tile's staircase leads, or null if it isn't one. Stairways are the tiles whose
- * region transition needs a deliberate `>`/`<` rather than firing the moment you step on them
- * (see TurnManager.useStairs) — so "is this a stairway" is asked from several places and lives
- * here, next to the tile table it reads.
+ * Which kind of crossing a tile offers, or null if it isn't one.
+ *
+ * These are the tiles whose region transition needs a deliberate `>`/`<` rather than firing the
+ * moment you step on them (see TurnManager.useTransition). Doors are on this list for the same
+ * reason stairs are, and it matters more in a city than it ever did in a desert: auto-travel must
+ * never route you *through* a building because cutting the corner was two steps shorter.
+ *
+ * Asked from several places, so it lives here next to the tile table it reads.
  */
-export function stairwayDirection(tileId: string): StairwayDirection | null {
+export function transitionKind(tileId: string): TransitionKind | null {
   if (tileId === 'stairsDown') return 'down';
   if (tileId === 'stairsUp') return 'up';
+  if (tileId === 'door') return 'door';
   return null;
+}
+
+/** Whether stepping on this tile should *not* cross by itself. See transitionKind. */
+export function isDeliberateTransition(tileId: string): boolean {
+  return transitionKind(tileId) !== null;
 }

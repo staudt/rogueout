@@ -61,6 +61,8 @@ describe('who a shout reaches', () => {
       groundItems: [],
       npcs: [],
       visibility: createVisibility(80, 80),
+      name: 'test arena',
+      transitions: [],
     };
   }
 

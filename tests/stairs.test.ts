@@ -39,14 +39,14 @@ describe('stairways need a deliberate >/<', () => {
 
     expect(state.activeRegionId).toBe('overworld');
     expect(state.player).toMatchObject(OVERWORLD_DUNGEON_ENTRANCE);
-    expect(turnManager.stairwayUnderPlayer()).toBe('down');
+    expect(turnManager.transitionUnderPlayer()).toBe('down');
     expect(state.messageLog.join(' ')).toMatch(/stairs down/i);
   });
 
   it('> on the staircase crosses into the dungeon', () => {
     const { state, turnManager } = makeGame(OVERWORLD_DUNGEON_ENTRANCE.x, OVERWORLD_DUNGEON_ENTRANCE.y);
 
-    expect(turnManager.useStairs('down')).toBe(true);
+    expect(turnManager.useTransition('down')).toBe(true);
 
     expect(state.activeRegionId).toBe('dungeon-1');
     expect(state.player).toMatchObject(DUNGEON1_SPAWN_FROM_WILDERNESS);
@@ -56,7 +56,7 @@ describe('stairways need a deliberate >/<', () => {
   it('the wrong stair key costs nothing', () => {
     const { state, turnManager } = makeGame(OVERWORLD_DUNGEON_ENTRANCE.x, OVERWORLD_DUNGEON_ENTRANCE.y);
 
-    expect(turnManager.useStairs('up')).toBe(false);
+    expect(turnManager.useTransition('up')).toBe(false);
 
     expect(state.activeRegionId).toBe('overworld');
     expect(state.turnCount).toBe(0);
@@ -66,7 +66,7 @@ describe('stairways need a deliberate >/<', () => {
   it('> away from any staircase costs nothing', () => {
     const { state, turnManager } = makeGame(5, 15);
 
-    expect(turnManager.useStairs('down')).toBe(false);
+    expect(turnManager.useTransition('down')).toBe(false);
 
     expect(state.turnCount).toBe(0);
     expect(state.messageLog.at(-1)).toContain('no staircase leading down');

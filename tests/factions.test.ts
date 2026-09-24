@@ -20,7 +20,7 @@ function openArena(width = 20, height = 9): RegionState {
   for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) setTileId(map, x, y, 'floor');
   const visibility = createVisibility(width, height);
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) markVisible(visibility, x, y);
-  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+  return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 }
 
 function arenaState(region: RegionState, playerX = 1, playerY = 1): GameState {
@@ -242,7 +242,7 @@ describe('hunters go around obstructions', () => {
     for (let y = 1; y < 4; y++) for (let x = 1; x < 11; x++) setTileId(map, x, y, 'floor');
     const visibility = createVisibility(12, 5);
     for (let y = 0; y < 5; y++) for (let x = 0; x < 12; x++) markVisible(visibility, x, y);
-    return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+    return { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
   }
 
   it('steps around a packmate standing between it and its target', () => {
@@ -282,7 +282,7 @@ describe('hunters go around obstructions', () => {
     for (let x = 3; x < 8; x++) setTileId(map, x, 2, 'floor');
     const visibility = createVisibility(9, 5);
     for (let y = 0; y < 5; y++) for (let x = 0; x < 9; x++) markVisible(visibility, x, y);
-    const region: RegionState = { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+    const region: RegionState = { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility, name: 'test arena', transitions: [] };
 
     const hunter = createMonster({ ...MONSTERS['feralGhoul']!, speed: 12, awarenessRadius: 20 }, 1, 2);
     region.monsters.push(hunter);

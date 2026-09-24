@@ -3,6 +3,7 @@ import type { Player } from '../entities/Player';
 import type { Monster } from '../entities/Monster';
 import type { Npc } from '../entities/Npc';
 import type { VisibilityData } from '../fov/VisibilityState';
+import type { RegionTransition } from '../world/regions/RegionTypes';
 import type { GroundItem } from '../items/Item';
 import { isVisible } from '../fov/VisibilityState';
 import { chebyshevDistance } from '../utils/geometry';
@@ -10,6 +11,20 @@ import { computeSpotRadius } from '../combat/CombatFormulas';
 
 /** Everything specific to one region (the overworld, a dungeon level, ...). */
 export interface RegionState {
+  /**
+   * What this place is called, and what it feels like to arrive. These live on the *state* rather
+   * than being looked up in `REGIONS` because a region can now be built from a recipe at runtime
+   * (a building's interior, a stretch of tunnel) and so may have no entry in that table at all —
+   * every display site would otherwise fall back to printing a raw region id.
+   */
+  name: string;
+  arrival?: string;
+  /**
+   * Where this region's exits are. Also on the state, and for the sharper version of the same
+   * reason: a generated city's doorways aren't known until generation has run, and they have to
+   * survive a reload.
+   */
+  transitions: RegionTransition[];
   map: GameMapData;
   /** Lit by the sun: sight is limited by terrain rather than by how far a torch throws. */
   daylight: boolean;

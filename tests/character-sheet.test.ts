@@ -1,3 +1,4 @@
+import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { describe, expect, it } from 'vitest';
 import { describeCharacter } from '../src/ui/screens/CharacterSheet';
 import type { GameState, RegionState } from '../src/engine/GameState';
@@ -7,7 +8,9 @@ import { createItem } from '../src/items/Item';
 function makeState(): GameState {
   return {
     player: createPlayer(1, 1),
-    regions: {} as Record<string, RegionState>,
+    // A real region, because the name now comes off the region's own state rather than a lookup
+    // in a static table — which is what lets a generated interior have a name at all.
+    regions: { overworld: ensureRegionLoaded({}, 'overworld') } as Record<string, RegionState>,
     activeRegionId: 'overworld',
     turnCount: 12,
     messageLog: [],

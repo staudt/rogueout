@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ensureRegionLoaded, REGIONS } from '../src/world/regions/RegionRegistry';
+import { ensureRegionLoaded, REGIONS, STORE_INTERIOR_RECIPE } from '../src/world/regions/RegionRegistry';
+import type { RegionRecipe } from '../src/world/regions/RegionTypes';
 import { isWalkable, type GameMapData } from '../src/world/GameMap';
 import type { RegionState } from '../src/engine/GameState';
 
@@ -53,10 +54,24 @@ describe('handcrafted region connectivity', () => {
   // This is the exact class of bug that shipped in an earlier milestone: a walled-off area with
   // no door, silently unreachable. Every handcrafted region's walkable tiles must form a single
   // connected component — no isolated pockets — so a spawn/NPC/item placed anywhere is reachable.
-  for (const def of Object.values(REGIONS)) {
+  //
+  // Every region has to face this, whether it's named in REGIONS or built on demand from a recipe:
+  // an interior nobody can cross is exactly as broken as a walled-off town, and the recipe-built
+  // ones are the easier to overlook precisely because they aren't listed anywhere.
+  const cases: Array<{ id: string; load: () => RegionState }> = [
+    ...Object.values(REGIONS).map((def) => ({
+      id: def.id,
+      load: () => ensureRegionLoaded({}, def.id),
+    })),
+    ...([STORE_INTERIOR_RECIPE] as RegionRecipe[]).map((recipe) => ({
+      id: recipe.regionId,
+      load: () => ensureRegionLoaded({}, recipe.regionId, recipe),
+    })),
+  ];
+
+  for (const def of cases) {
     it(`${def.id} has no isolated (unreachable) walkable areas`, () => {
-      const regions: Record<string, RegionState> = {};
-      const region = ensureRegionLoaded(regions, def.id);
+      const region = def.load();
 
       const allWalkable = findAllWalkable(region.map);
       expect(allWalkable.length).toBeGreaterThan(0);
@@ -69,8 +84,7 @@ describe('handcrafted region connectivity', () => {
     });
 
     it(`${def.id}'s NPCs, monsters, ground items, and transitions are all reachable`, () => {
-      const regions: Record<string, RegionState> = {};
-      const region = ensureRegionLoaded(regions, def.id);
+      const region = def.load();
 
       const allWalkable = findAllWalkable(region.map);
       const [startX, startY] = allWalkable[0]!;
@@ -85,7 +99,7 @@ describe('handcrafted region connectivity', () => {
       for (const ground of region.groundItems) {
         expect(reached.has(`${ground.x},${ground.y}`)).toBe(true);
       }
-      for (const transition of def.transitions) {
+      for (const transition of region.transitions) {
         expect(reached.has(`${transition.x},${transition.y}`)).toBe(true);
       }
     });
