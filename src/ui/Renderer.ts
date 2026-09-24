@@ -1,6 +1,6 @@
 import type { GameState } from '../engine/GameState';
 import { getActiveRegion } from '../engine/GameState';
-import { TILE_SIZE, VIEWPORT_COLS, VIEWPORT_ROWS } from '../config/constants';
+import { MIN_VIEWPORT_COLS, MIN_VIEWPORT_ROWS, TILE_SIZE } from '../config/constants';
 import { getTileId } from '../world/GameMap';
 import { TILES } from '../world/Tile';
 import { isExplored, isVisible } from '../fov/VisibilityState';
@@ -15,18 +15,64 @@ export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
   private readonly camera: Camera;
+  private ratio = 0;
 
   constructor(canvas: HTMLCanvasElement, camera: Camera) {
     this.canvas = canvas;
     this.camera = camera;
-    canvas.width = VIEWPORT_COLS * TILE_SIZE;
-    canvas.height = VIEWPORT_ROWS * TILE_SIZE;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context unavailable');
     this.ctx = ctx;
+
+    this.resize();
+  }
+
+  /** The element whose size the canvas fills — what a ResizeObserver should watch. */
+  hostElement(): HTMLElement | null {
+    return this.canvas.parentElement;
+  }
+
+  /**
+   * Fits the canvas to the space its container gives it, in whole tiles, and tells the camera how
+   * many it now has. Call on startup and on every window resize.
+   *
+   * The canvas is sized to an exact multiple of TILE_SIZE rather than to the container, so there's
+   * never a half-drawn row along an edge; the leftover strip is background, centred by CSS.
+   */
+  resize(): boolean {
+    const host = this.canvas.parentElement;
+    const availableWidth = host?.clientWidth ?? 0;
+    const availableHeight = host?.clientHeight ?? 0;
+
+    // Nothing to measure (jsdom, or a layout that hasn't happened yet) — fall back rather than
+    // collapsing the viewport to zero tiles.
+    const cols = availableWidth > 0 ? Math.max(1, Math.floor(availableWidth / TILE_SIZE)) : MIN_VIEWPORT_COLS;
+    const rows = availableHeight > 0 ? Math.max(1, Math.floor(availableHeight / TILE_SIZE)) : MIN_VIEWPORT_ROWS;
+    const ratio = window.devicePixelRatio || 1;
+
+    // Nothing to do — bail before touching the canvas, since assigning width/height wipes it and
+    // resets the context even when the value is unchanged.
+    if (cols === this.camera.cols && rows === this.camera.rows && ratio === this.ratio) return false;
+
+    this.ratio = ratio;
+    this.camera.resize(cols, rows);
+
+    const cssWidth = cols * TILE_SIZE;
+    const cssHeight = rows * TILE_SIZE;
+
+    // Back the canvas at the display's real pixel density, then scale the context to match, so
+    // glyphs stay sharp on HiDPI screens instead of being upscaled from a CSS-pixel bitmap.
+    this.canvas.width = Math.round(cssWidth * ratio);
+    this.canvas.height = Math.round(cssHeight * ratio);
+    this.canvas.style.width = `${cssWidth}px`;
+    this.canvas.style.height = `${cssHeight}px`;
+
+    // Resizing a canvas resets its context, so transform and font are (re)applied here, after.
+    this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     this.ctx.font = `${TILE_SIZE - 4}px monospace`;
     this.ctx.textBaseline = 'top';
+    return true;
   }
 
   render(state: GameState): void {
@@ -35,11 +81,11 @@ export class Renderer {
     const { ctx } = this;
 
     ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillRect(0, 0, this.camera.cols * TILE_SIZE, this.camera.rows * TILE_SIZE);
 
-    for (let sy = 0; sy < VIEWPORT_ROWS; sy++) {
+    for (let sy = 0; sy < this.camera.rows; sy++) {
       const worldY = this.camera.originY + sy;
-      for (let sx = 0; sx < VIEWPORT_COLS; sx++) {
+      for (let sx = 0; sx < this.camera.cols; sx++) {
         const worldX = this.camera.originX + sx;
 
         const visible = isVisible(region.visibility, worldX, worldY);

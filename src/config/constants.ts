@@ -1,6 +1,12 @@
 export const TILE_SIZE = 20;
-export const VIEWPORT_COLS = 40;
-export const VIEWPORT_ROWS = 25;
+
+/**
+ * Fallback viewport size in tiles. The real size is measured from the window at runtime (see
+ * Renderer.resize) so the map fills whatever space the page has; these are only used when there's
+ * nothing to measure — jsdom in tests, or a layout that hasn't happened yet.
+ */
+export const MIN_VIEWPORT_COLS = 40;
+export const MIN_VIEWPORT_ROWS = 25;
 
 /** Max gap (ms) between the first and second arrow-key press to count as a diagonal chord. */
 export const DIAGONAL_CHORD_WINDOW_MS = 45;

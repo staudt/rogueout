@@ -22,6 +22,7 @@ import { AUTO_TRAVEL_STEP_MS } from '../config/constants';
 import { Camera } from '../ui/Camera';
 import { Renderer } from '../ui/Renderer';
 import { MessageLog } from '../ui/MessageLog';
+import { StatusBar } from '../ui/StatusBar';
 import { Menu, type MenuOption } from '../ui/menus/Menu';
 import { createLocalStorageAdapter, type SaveStorage } from '../persistence/LocalStorageAdapter';
 import { clearSave, hasSave, loadGame, saveGame } from '../persistence/SaveGame';
@@ -58,6 +59,7 @@ export class Game {
   private readonly events = new EventBus<GameEvents>();
   private readonly renderer: Renderer;
   private readonly messageLog: MessageLog;
+  private readonly statusBar: StatusBar;
   private readonly menu: Menu;
   private readonly screens: ScreenManager;
   private readonly input: InputManager;
@@ -68,18 +70,21 @@ export class Game {
   private pendingInteractTarget: Point | null = null;
   /** Guards against pushing the game-over screen more than once for the same death. */
   private gameOverShown = false;
+  private resizeFrameId: number | null = null;
   private readonly storage: SaveStorage;
 
   constructor(
     canvas: HTMLCanvasElement,
     messageLogEl: HTMLElement,
     menuEl: HTMLElement,
+    statusBarEl: HTMLElement,
     storage: SaveStorage = createLocalStorageAdapter(),
   ) {
     this.storage = storage;
     const camera = new Camera();
     this.renderer = new Renderer(canvas, camera);
     this.messageLog = new MessageLog(messageLogEl);
+    this.statusBar = new StatusBar(statusBarEl);
     this.menu = new Menu(menuEl, () => this.screens.dismiss());
     this.screens = new ScreenManager(
       this.menu,
@@ -151,6 +156,7 @@ export class Game {
   start(): void {
     this.input.attach(window);
     this.mouseInput.attach();
+    this.observeViewportSize();
     this.render();
     this.showTitleScreen();
 
@@ -816,9 +822,44 @@ export class Game {
     this.render();
   }
 
+  /**
+   * Watches the band the map lives in, rather than the window.
+   *
+   * Window resizes are only *one* reason that band changes size: it also shrinks the moment the
+   * status bar first gets content, which happens after the initial measurement. Observing the
+   * container catches every cause, so the canvas can't end up sized to a layout that no longer
+   * exists. (Sizing the canvas doesn't resize the container back — it's flex-sized with
+   * `overflow: hidden` — so there's no feedback loop.)
+   */
+  private observeViewportSize(): void {
+    const host = this.canvasHost();
+    if (host && typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(this.handleResize).observe(host);
+      return;
+    }
+    window.addEventListener('resize', this.handleResize);
+  }
+
+  /**
+   * Re-measures the canvas and redraws. Coalesced onto an animation frame because a window drag
+   * emits size changes far faster than there's any point redrawing.
+   */
+  private readonly handleResize = (): void => {
+    if (this.resizeFrameId !== null) return;
+    this.resizeFrameId = window.requestAnimationFrame(() => {
+      this.resizeFrameId = null;
+      if (this.renderer.resize()) this.render();
+    });
+  };
+
+  private canvasHost(): HTMLElement | null {
+    return this.renderer.hostElement();
+  }
+
   private render(): void {
     this.renderer.render(this.state);
     this.messageLog.render(this.state.messageLog);
+    this.statusBar.render(this.state);
   }
 }
 

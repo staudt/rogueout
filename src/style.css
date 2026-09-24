@@ -11,22 +11,29 @@ body {
   overflow: hidden;
 }
 
+/*
+ * Full-page layout: a fixed-height message log on top, a fixed-height status line at the bottom,
+ * and the map filling every pixel between them. The canvas measures that middle band at runtime
+ * (Renderer.resize) rather than being a fixed 40x25, so the world uses the whole window.
+ */
 #app {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   width: 100vw;
   height: 100vh;
-  gap: 4px;
 }
 
 #viewport {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0; /* without this a flex child refuses to shrink below its content */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 #game-canvas {
-  image-rendering: pixelated;
   background: #000;
   display: block;
 }
@@ -35,6 +42,7 @@ body {
   position: absolute;
   top: 20px;
   left: 20px;
+  z-index: 1;
   min-width: 220px;
   max-width: calc(100% - 40px);
   background: #111;
@@ -105,16 +113,44 @@ body {
 }
 
 #message-log {
-  width: 800px;
-  max-width: 90vw;
+  flex: 0 0 auto;
   height: 7.5em;
   overflow-y: auto;
   background: #0a0a0a;
-  border: 1px solid #333;
+  border-bottom: 1px solid #333;
   color: #ccc;
   font-family: monospace;
   font-size: 14px;
   line-height: 1.25em;
-  padding: 4px 8px;
+  padding: 4px 10px;
   box-sizing: border-box;
+}
+
+#status-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  align-items: baseline;
+  background: #0a0a0a;
+  border-top: 1px solid #333;
+  color: #ddd;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 5px 10px;
+  box-sizing: border-box;
+}
+
+#status-bar .status-label {
+  color: #888;
+  margin-right: 5px;
+}
+
+#status-bar .status-label:empty {
+  margin-right: 0;
+}
+
+#status-bar .status-danger .status-value {
+  color: #ff5555;
+  font-weight: bold;
 }
