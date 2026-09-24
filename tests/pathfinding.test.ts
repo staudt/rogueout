@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findPath } from '../src/pathfinding/BFS';
+import { findPath, findPathToAny } from '../src/pathfinding/BFS';
 import { walkableLineToward } from '../src/pathfinding/StraightLine';
 import { chebyshevDistance, type Point } from '../src/utils/geometry';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
@@ -14,15 +14,20 @@ function isPassableFor(rows: readonly string[]) {
   };
 }
 
+/** The same rows as a PathGrid — findPath works on flat indices now, so it needs the dimensions. */
+function gridFor(rows: readonly string[]) {
+  return { width: rows[0]?.length ?? 0, height: rows.length, isPassable: isPassableFor(rows) };
+}
+
 describe('findPath (BFS)', () => {
   it('returns an empty path when start equals goal', () => {
     const rows = ['...', '...', '...'];
-    expect(findPath({ x: 1, y: 1 }, { x: 1, y: 1 }, isPassableFor(rows))).toEqual([]);
+    expect(findPath({ x: 1, y: 1 }, { x: 1, y: 1 }, gridFor(rows))).toEqual([]);
   });
 
   it('finds a direct diagonal path when nothing blocks it', () => {
     const rows = ['.....', '.....', '.....', '.....', '.....'];
-    const path = findPath({ x: 0, y: 0 }, { x: 4, y: 4 }, isPassableFor(rows));
+    const path = findPath({ x: 0, y: 0 }, { x: 4, y: 4 }, gridFor(rows));
     expect(path).not.toBeNull();
     // Diagonal-cost-1 means the shortest path to a point 4 away diagonally is exactly 4 steps.
     expect(path).toHaveLength(4);
@@ -32,18 +37,18 @@ describe('findPath (BFS)', () => {
   it('returns null when the goal is unreachable (sealed off)', () => {
     const rows = ['.....', '.###.', '.#.#.', '.###.', '.....'];
     // (2,2) is sealed inside a box with no door.
-    expect(findPath({ x: 0, y: 0 }, { x: 2, y: 2 }, isPassableFor(rows))).toBeNull();
+    expect(findPath({ x: 0, y: 0 }, { x: 2, y: 2 }, gridFor(rows))).toBeNull();
   });
 
   it('returns null when the goal itself is not passable', () => {
     const rows = ['...', '.#.', '...'];
-    expect(findPath({ x: 0, y: 0 }, { x: 1, y: 1 }, isPassableFor(rows))).toBeNull();
+    expect(findPath({ x: 0, y: 0 }, { x: 1, y: 1 }, gridFor(rows))).toBeNull();
   });
 
   it('routes around an obstacle rather than failing, never stepping on a wall', () => {
     // The wall sits in the travel row itself; row 1 is the only detour route around it.
     const rows = ['.#####.', '.......'];
-    const path = findPath({ x: 0, y: 0 }, { x: 6, y: 0 }, isPassableFor(rows));
+    const path = findPath({ x: 0, y: 0 }, { x: 6, y: 0 }, gridFor(rows));
     expect(path).not.toBeNull();
     for (const p of path ?? []) {
       expect(isPassableFor(rows)(p.x, p.y)).toBe(true);
@@ -55,7 +60,7 @@ describe('findPath (BFS)', () => {
     // unobstructed Chebyshev distance (6) — unlike a shallow 1-row dip, which 8-directional
     // movement can absorb into diagonals at no extra cost (see the test above).
     const rows = ['.#####.', '.#####.', '.#####.', '.......'];
-    const path = findPath({ x: 0, y: 0 }, { x: 6, y: 0 }, isPassableFor(rows));
+    const path = findPath({ x: 0, y: 0 }, { x: 6, y: 0 }, gridFor(rows));
     expect(path).not.toBeNull();
     expect(path?.length).toBeGreaterThan(6);
     for (const p of path ?? []) {
@@ -63,9 +68,50 @@ describe('findPath (BFS)', () => {
     }
   });
 
+  it('routes across a city-sized grid instead of silently giving up', () => {
+    // The regression this guards: findPath used to carry a hard 5,000-node cap and return null on
+    // overrun, and the caller reads null as "no route" and falls back to walking in a straight
+    // line. On a 250x250 map that meant long clicks quietly stopped routing around buildings —
+    // no error, no message, just a player wondering why they keep walking into walls.
+    const width = 250;
+    const height = 250;
+    const grid = {
+      width,
+      height,
+      // Vertical walls with a gap at alternating ends, forcing a genuine serpentine route rather
+      // than a straight run that any budget would survive.
+      isPassable: (x: number, y: number) => {
+        if (x < 0 || y < 0 || x >= width || y >= height) return false;
+        if (x % 10 !== 0) return true;
+        return (x / 10) % 2 === 0 ? y === height - 1 : y === 0;
+      },
+    };
+
+    const path = findPath({ x: 1, y: 1 }, { x: width - 2, y: height - 2 }, grid);
+
+    expect(path).not.toBeNull();
+    expect(path!.at(-1)).toEqual({ x: width - 2, y: height - 2 });
+    for (const step of path!) expect(grid.isPassable(step.x, step.y)).toBe(true);
+  });
+
+  it('still honours an explicit node budget, which the AI relies on', () => {
+    // The default is uncapped, but a blocked creature asks for a cheap step around a body every
+    // turn and must not be allowed to solve the map to get it.
+    const rows = ['.#####.', '.#####.', '.#####.', '.......'];
+    expect(findPath({ x: 0, y: 0 }, { x: 6, y: 0 }, { ...gridFor(rows), maxNodes: 3 })).toBeNull();
+  });
+
+  it('does not let a path wrap around the edge of the grid', () => {
+    // Flat y * width + x indices make this the easy mistake: x = -1 on row 3 is index 3*w - 1,
+    // a real passable tile at the far end of row 2. Both ends of every row are open here, so a
+    // wrapping search would find a two-step "path" straight through the map edge.
+    const rows = ['...', '###', '...'];
+    expect(findPath({ x: 0, y: 0 }, { x: 2, y: 2 }, gridFor(rows))).toBeNull();
+  });
+
   it('produces a contiguous path (each step adjacent to the last, including diagonals)', () => {
     const rows = new Array(10).fill('.'.repeat(10));
-    const path = findPath({ x: 0, y: 0 }, { x: 9, y: 7 }, isPassableFor(rows));
+    const path = findPath({ x: 0, y: 0 }, { x: 9, y: 7 }, gridFor(rows));
     expect(path).not.toBeNull();
     let prev: Point = { x: 0, y: 0 };
     for (const step of path ?? []) {
@@ -73,6 +119,48 @@ describe('findPath (BFS)', () => {
       expect(Math.abs(step.y - prev.y)).toBeLessThanOrEqual(1);
       prev = step;
     }
+  });
+});
+
+describe('findPathToAny (walking up to someone)', () => {
+  it('reaches the nearest of several goals', () => {
+    const rows = ['..........', '..........', '..........'];
+    const path = findPathToAny({ x: 0, y: 1 }, [{ x: 9, y: 1 }, { x: 3, y: 1 }], gridFor(rows));
+
+    expect(path?.at(-1)).toEqual({ x: 3, y: 1 });
+  });
+
+  it('skips goals that are blocked and takes a reachable one', () => {
+    const rows = ['....', '.#..', '....'];
+    const path = findPathToAny({ x: 0, y: 0 }, [{ x: 1, y: 1 }, { x: 3, y: 2 }], gridFor(rows));
+
+    expect(path?.at(-1)).toEqual({ x: 3, y: 2 });
+  });
+
+  it('returns an empty path when already standing on one of the goals', () => {
+    const rows = ['....', '....'];
+    expect(findPathToAny({ x: 2, y: 1 }, [{ x: 2, y: 1 }, { x: 0, y: 0 }], gridFor(rows))).toEqual([]);
+  });
+
+  it('returns null when every goal is unreachable', () => {
+    // The shopkeeper-in-the-doorway case: the tiles exist and are walkable, but nothing can get
+    // to them. Answering with the nearest *reachable* tile instead would be a different question.
+    const rows = ['.....', '.###.', '.#.#.', '.###.', '.....'];
+    expect(findPathToAny({ x: 0, y: 0 }, [{ x: 2, y: 2 }], gridFor(rows))).toBeNull();
+    expect(findPathToAny({ x: 0, y: 0 }, [], gridFor(rows))).toBeNull();
+  });
+
+  it('agrees with running one findPath per goal, for a fraction of the work', () => {
+    const rows = ['.........', '..#####..', '.........', '..#####..', '.........'];
+    const goals = [{ x: 8, y: 0 }, { x: 4, y: 2 }, { x: 0, y: 4 }];
+
+    let best: number | null = null;
+    for (const goal of goals) {
+      const path = findPath({ x: 0, y: 0 }, goal, gridFor(rows));
+      if (path && (best === null || path.length < best)) best = path.length;
+    }
+
+    expect(findPathToAny({ x: 0, y: 0 }, goals, gridFor(rows))?.length).toBe(best);
   });
 });
 
@@ -222,7 +310,7 @@ describe('no single creature can cut the world in half (the real overworld)', ()
       isPassableFor(rows)(x, y) && !(x === chokepoint.x && y === chokepoint.y);
     const goal = { x: 3, y: 0 };
 
-    expect(findPath({ x: 3, y: 3 }, goal, isPassable)).toBeNull();
+    expect(findPath({ x: 3, y: 3 }, goal, { ...gridFor(rows), isPassable })).toBeNull();
 
     // From back down the corridor, you walk up to whatever is holding the gap and stop there.
     expect(walkableLineToward({ x: 3, y: 3 }, goal, isPassable)).toEqual([{ x: 3, y: 2 }]);

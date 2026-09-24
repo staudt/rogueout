@@ -53,6 +53,31 @@ export function livingActors(state: GameState, region: RegionState): Actor[] {
   ];
 }
 
+/**
+ * Whoever is standing on a tile, or null.
+ *
+ * This exists because the pathfinding probes were asking the question via `livingActors()`, which
+ * builds three arrays (two filters and a spread) to answer it — once *per tile examined*. A single
+ * blocked hunter running a 150-node detour search was therefore allocating 150 throwaway copies of
+ * everything alive, every turn, and the cost grows with the map and the population together.
+ *
+ * Scanning in place with an early exit is O(actors) rather than O(1), which a position-keyed index
+ * would give — but an index has to be kept in step with every move, knockback and death, and going
+ * stale would mean creatures walking through each other. For the few dozen actors a region holds,
+ * removing the allocation is the whole win; the index is only worth its risk if profiling later
+ * says the scan itself is the problem.
+ */
+export function actorAt(state: GameState, region: RegionState, x: number, y: number): Actor | null {
+  if (state.player.x === x && state.player.y === y) return state.player;
+  for (const monster of region.monsters) {
+    if (monster.hp > 0 && monster.x === x && monster.y === y) return monster;
+  }
+  for (const npc of region.npcs) {
+    if (npc.hp > 0 && npc.x === x && npc.y === y) return npc;
+  }
+  return null;
+}
+
 export function provoke(target: Provokable, faction: FactionId): boolean {
   if (target.provokedBy.includes(faction)) return false;
   target.provokedBy.push(faction);

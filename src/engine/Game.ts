@@ -18,7 +18,8 @@ import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import { OVERWORLD_SPAWN } from '../world/maps/overworld';
 import { isWalkable } from '../world/GameMap';
 import { isExplored } from '../fov/VisibilityState';
-import { findPath } from '../pathfinding/BFS';
+import { actorAt } from '../ai/Actors';
+import { findPath, findPathToAny } from '../pathfinding/BFS';
 import { walkableLineToward } from '../pathfinding/StraightLine';
 import { flingItem, kickCreature } from '../combat/Kick';
 import { AutoTravel } from '../pathfinding/AutoTravel';
@@ -30,6 +31,7 @@ import { InputManager, type ActionKey } from '../input/InputManager';
 import { MouseInput } from '../input/MouseInput';
 import {
   AUTO_TRAVEL_STEP_MS,
+  AUTOSAVE_TURN_INTERVAL,
   DEFAULT_THROW_BONUS,
   KICK_ACCURACY_PENALTY,
   KICK_ITEM_RANGE,
@@ -103,6 +105,12 @@ export class Game {
   /** For effects Game resolves itself (kicks, throws) rather than routing through TurnManager. */
   private rng: RNG = createRNG(Date.now());
   private readonly storage: SaveStorage;
+  /** Turns since the last write, for the autosave throttle. See flushSave/onTurnEnded. */
+  private turnsSinceSave = 0;
+  /** Which region the last write covered, so crossing into a new one always forces a flush. */
+  private savedRegionId: string | null = null;
+  /** A failed save is told to the player once, not once per turn. Reset by resetState(). */
+  private saveFailureReported = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -165,6 +173,9 @@ export class Game {
   /** Builds a fresh run: new world state, new turn manager, clean log. */
   private resetState(): void {
     this.cancelAutoTravel();
+    this.turnsSinceSave = 0;
+    this.savedRegionId = null;
+    this.saveFailureReported = false;
 
     const regions: Record<string, RegionState> = {};
     ensureRegionLoaded(regions, 'overworld');
@@ -194,6 +205,7 @@ export class Game {
     this.input.attach(window);
     this.mouseInput.attach();
     this.observeViewportSize();
+    this.saveBeforeLeaving();
     this.render();
     this.showTitleScreen();
 
@@ -205,6 +217,22 @@ export class Game {
         getActiveRegion: () => getActiveRegion(this.state),
       };
     }
+  }
+
+  /**
+   * The throttle's safety net: whatever the turn counter says, the run is written out before the
+   * tab can go away. Both events are needed — `pagehide` covers a close or a navigation, and
+   * `visibilitychange` covers a mobile browser backgrounding the tab and never firing anything
+   * else before killing it, which is the case that would otherwise silently eat ten turns.
+   */
+  private saveBeforeLeaving(): void {
+    const flush = () => {
+      if (this.state && !this.state.gameOver && this.turnsSinceSave > 0) this.flushSave();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+    });
   }
 
   private handleMapClick(target: Point): void {
@@ -241,7 +269,7 @@ export class Game {
     }
 
     const isPassable = this.isPassableIn(region);
-    const path = findPath(player, target, isPassable);
+    const path = findPath(player, target, { ...region.map, isPassable });
     if (path && path.length > 0) {
       this.autoTravel.start(path);
       this.stepAutoTravel();
@@ -268,13 +296,14 @@ export class Game {
     const region = getActiveRegion(this.state);
     const isPassable = this.isPassableIn(region);
 
-    let bestPath: Point[] | null = null;
-    for (const vector of Object.values(DIRECTION_VECTORS)) {
-      const candidate = { x: targetPos.x + vector.x, y: targetPos.y + vector.y };
-      if (!isPassable(candidate.x, candidate.y)) continue;
-      const path = findPath(this.state.player, candidate, isPassable);
-      if (path && (!bestPath || path.length < bestPath.length)) bestPath = path;
-    }
+    // One search over all eight tiles around them, not eight searches. BFS expands in order of
+    // path length, so the first one it reaches is the closest — which is what the eight separate
+    // searches were computing the expensive way.
+    const adjacent = Object.values(DIRECTION_VECTORS).map((v) => ({
+      x: targetPos.x + v.x,
+      y: targetPos.y + v.y,
+    }));
+    const bestPath = findPathToAny(this.state.player, adjacent, { ...region.map, isPassable });
 
     if (!bestPath) {
       addMessage(this.state, "You can't find a path there.");
@@ -295,10 +324,9 @@ export class Game {
    * stepAutoTravel are what keep this from feeling omniscient, not withholding wall data.
    */
   private isPassableIn(region: RegionState): (x: number, y: number) => boolean {
-    return (x, y) =>
-      isWalkable(region.map, x, y) &&
-      !region.monsters.some((m) => m.hp > 0 && m.x === x && m.y === y) &&
-      !region.npcs.some((n) => n.x === x && n.y === y);
+    // Via actorAt so "is someone standing here" has one definition. The hand-rolled version this
+    // replaced also forgot to check `hp > 0` on NPCs, so a corpse's tile stayed unroutable.
+    return (x, y) => isWalkable(region.map, x, y) && actorAt(this.state, region, x, y) === null;
   }
 
   private stepAutoTravel(): void {
@@ -411,12 +439,18 @@ export class Game {
   }
 
   private cancelAutoTravel(): void {
+    const wasTravelling = this.autoTravel.isActive();
+
     if (this.autoTravelTimerId !== null) {
       window.clearTimeout(this.autoTravelTimerId);
       this.autoTravelTimerId = null;
     }
     this.autoTravel.cancel();
     this.pendingInteractTarget = null;
+
+    // onTurnEnded skips saving while travelling, so this is where those turns get written —
+    // whether the walk finished, was interrupted, or the player pressed a key mid-stride.
+    if (wasTravelling && this.turnsSinceSave > 0) this.flushSave();
   }
 
   private handleAction(key: ActionKey): void {
@@ -1048,6 +1082,9 @@ export class Game {
   /** Esc with nothing open: the out-of-world menu, as opposed to Enter's in-world command menu. */
   private openGameMenu(): void {
     if (this.state.gameOver) return;
+    // Opening this menu is the clearest signal there is that the player is about to stop, so
+    // whatever the throttle thinks, write the run out before showing them the option to quit.
+    this.flushSave();
     this.screens.push<GameMenuAction>({
       title: 'Game',
       options: [
@@ -1073,6 +1110,8 @@ export class Game {
    */
   private saveAndQuit(): void {
     this.cancelAutoTravel();
+    this.turnsSinceSave = 0;
+    this.savedRegionId = this.state.activeRegionId;
     const saved = saveGame(this.storage, this.state);
     this.showTitleScreen(
       saved ? 'Run saved. Continue when you like.' : "Couldn't save — your browser refused storage.",
@@ -1117,7 +1156,50 @@ export class Game {
       this.showGameOver();
       return;
     }
-    saveGame(this.storage, this.state);
+
+    this.turnsSinceSave += 1;
+
+    // Auto-travel is the case that matters: it steps ~11 times a second, and a full stringify
+    // plus a synchronous setItem on each one is the single most expensive thing in the frame.
+    // Skipping while travelling and flushing when it ends costs nothing — an interrupted walk
+    // ends the same way a completed one does, through cancelAutoTravel.
+    if (this.autoTravel.isActive()) return;
+
+    // Crossing into a region always writes, whatever the count says: a transition is both the
+    // largest change a single turn can make (a whole new grid) and the most likely moment for
+    // someone to close the tab.
+    if (this.state.activeRegionId !== this.savedRegionId) {
+      this.flushSave();
+      return;
+    }
+
+    if (this.turnsSinceSave >= AUTOSAVE_TURN_INTERVAL) this.flushSave();
+  }
+
+  /**
+   * Writes the run out now, and tells the player once per run if it didn't work.
+   *
+   * "Once per run" is the whole point of the flag: storage that refuses one write will refuse
+   * every subsequent one, and a message on each of them would bury the game under the same
+   * sentence. Saying nothing at all is the option this replaced, and it was worse — the player
+   * would find out by losing the run.
+   */
+  private flushSave(): void {
+    if (this.state.gameOver) return;
+
+    this.turnsSinceSave = 0;
+    this.savedRegionId = this.state.activeRegionId;
+
+    if (saveGame(this.storage, this.state)) {
+      this.saveFailureReported = false;
+      return;
+    }
+
+    if (!this.saveFailureReported) {
+      this.saveFailureReported = true;
+      addMessage(this.state, "Your browser refused to store the run. Keep playing, but it won't survive a reload.");
+      this.render();
+    }
   }
 
   private showGameOver(): void {

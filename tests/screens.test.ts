@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Menu } from '../src/ui/menus/Menu';
 import { ScreenManager } from '../src/ui/screens/ScreenManager';

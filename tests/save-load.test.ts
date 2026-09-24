@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearSave, hasSave, loadGame, saveGame } from '../src/persistence/SaveGame';
 import { createLocalStorageAdapter, createMemoryStorage, SAVE_KEY } from '../src/persistence/LocalStorageAdapter';
@@ -166,7 +167,8 @@ describe('malformed saves fall back to New Game', () => {
 
   for (const [name, raw] of corruptions) {
     it(`rejects ${name}`, () => {
-      expect(migrate(raw)).toBeNull();
+      // Not every corruption is caught by migrate — a structurally valid save whose tile runs
+      // don't add up only fails at decode. loadGame/hasSave are what must reject all of them.
       expect(loadGame(createMemoryStorage(raw))).toBeNull();
       expect(hasSave(createMemoryStorage(raw))).toBe(false);
     });
@@ -176,9 +178,28 @@ describe('malformed saves fall back to New Game', () => {
     expect(migrate(good)).not.toBeNull();
   });
 
+  it('rejects a v1-format save', () => {
+    // v1 saves predate the city map, region ids changed, and the game is permadeath single-slot.
+    // Refusing old saves is simpler than converting them — the cost is a new run, not lost progress.
+    const v1Save = good.replace(`"schemaVersion":${SAVE_SCHEMA_VERSION}`, '"schemaVersion":1');
+    expect(migrate(v1Save)).toBeNull();
+    expect(loadGame(createMemoryStorage(v1Save))).toBeNull();
+  });
+
+  it('does not store the transient visible FOV field', () => {
+    // `visible` is this turn's field of view, recomputed on load before anything reads it.
+    // Storing it would be redundant — the serialized save must not contain it.
+    expect(good).not.toContain('"visible"');
+  });
+
   function truncateTiles(raw: string): string {
     const parsed = JSON.parse(raw);
-    parsed.regions['overworld'].map.tiles = parsed.regions['overworld'].map.tiles.slice(0, 10);
+    // Drop the last whole [index, count] pair. The encoding stays structurally valid — even
+    // length, real palette indices — so this gets past migrate's shape checks and is caught only
+    // by decoding it and finding the grid short of its own width x height. That's the corruption
+    // worth guarding: a half-written save that looks fine until you stand in it.
+    const tiles = parsed.regions['overworld'].map.tiles;
+    tiles.runs = tiles.runs.slice(0, -2);
     return JSON.stringify(parsed);
   }
 });

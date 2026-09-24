@@ -23,6 +23,24 @@ import {
 /** A spread of seeds, so "works for every seed" claims aren't really "works for the one we shipped". */
 const SEEDS = [OVERWORLD_SEED, 0, 1, 7, 42, 999, 123456, 2 ** 31 - 1];
 
+/**
+ * Generation is deterministic in its seed, so generating the same world once per assertion is
+ * pure waste — this file did it around twenty times over. Memoized per seed, which keeps every
+ * test reading as "generate this seed and check X" while doing the work once.
+ *
+ * Deliberately not used by the determinism test below, which has to call the real thing twice.
+ */
+type GeneratedWorld = ReturnType<typeof generateOverworld>;
+const generated = new Map<number, GeneratedWorld>();
+
+function worldFor(seed: number): GeneratedWorld {
+  const cached = generated.get(seed);
+  if (cached) return cached;
+  const world = generateOverworld(seed);
+  generated.set(seed, world);
+  return world;
+}
+
 describe('value noise', () => {
   it('is deterministic for the same seed and coordinates', () => {
     for (const [x, y] of [
@@ -204,7 +222,7 @@ describe('generated overworld', () => {
   // never contains an unreachable walkable pocket.
   for (const seed of SEEDS) {
     it(`seed ${seed}: town, dungeon entrance, and all POIs are mutually reachable`, () => {
-      const { map, pois } = generateOverworld(seed);
+      const { map, pois } = worldFor(seed);
       const reached = reachableWalkable(map, OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y);
 
       expect(reached.has(`${OVERWORLD_DUNGEON_ENTRANCE.x},${OVERWORLD_DUNGEON_ENTRANCE.y}`)).toBe(true);
@@ -218,7 +236,7 @@ describe('generated overworld', () => {
     });
 
     it(`seed ${seed}: has exactly one walkable component and some POIs`, () => {
-      const { map, pois } = generateOverworld(seed);
+      const { map, pois } = worldFor(seed);
       const reached = reachableWalkable(map, OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y);
 
       for (let y = 0; y < map.height; y++) {

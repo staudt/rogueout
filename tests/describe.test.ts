@@ -122,7 +122,7 @@ describe('describing people, things and ground', () => {
   it('does not reveal a creature standing on remembered but unseen ground', () => {
     const r = region();
     markVisible(r.visibility, 9, 6);
-    r.visibility.visible.fill(false); // explored, but not currently in view
+    r.visibility.visible.fill(0); // explored, but not currently in view
     r.monsters.push(createMonster(MONSTERS['feralGhoul']!, 9, 6));
 
     expect(describeTile(state(r), 9, 6).title).not.toBe('feral ghoul');

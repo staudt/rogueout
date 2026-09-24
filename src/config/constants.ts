@@ -15,6 +15,14 @@ export const DIAGONAL_CHORD_WINDOW_MS = 45;
 export const AUTO_TRAVEL_STEP_MS = 90;
 
 /**
+ * Turns between autosaves during ordinary play. A save is a suspend, not a checkpoint, so the
+ * only thing at stake in the gap is a few turns of replay after a browser crash — whereas every
+ * deliberate way of stopping (the game menu, quitting to title, closing the tab, crossing into a
+ * region) flushes immediately, and those are how runs actually end.
+ */
+export const AUTOSAVE_TURN_INTERVAL = 10;
+
+/**
  * How far you can see terrain in the open under a hard sun: far enough that the limit is the
  * land itself, not the light. Sight is still blocked by anything opaque — a rock ridge hides what
  * is behind it exactly as a dungeon wall does.

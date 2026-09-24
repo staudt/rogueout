@@ -20,6 +20,7 @@ import { areHostile } from '../world/Factions';
 import {
   actorLabel,
   callOutEnemy,
+  actorAt,
   livingActors,
   noticeCorpses,
   reactToAttack,
@@ -325,7 +326,11 @@ function moveToward(monster: Provokable, target: Point, state: GameState, region
   const dy = Math.sign(target.y - monster.y);
   if (tryMoveMonster(monster, { x: monster.x + dx, y: monster.y + dy }, state, region)) return;
 
-  const path = findPath(monster, target, passableForMonster(monster, state, region), DETOUR_NODE_BUDGET);
+  const path = findPath(monster, target, {
+    ...region.map,
+    isPassable: passableForMonster(monster, state, region),
+    maxNodes: DETOUR_NODE_BUDGET,
+  });
   const next = path?.[0];
   if (next) tryMoveMonster(monster, next, state, region);
 }
@@ -339,7 +344,8 @@ function passableForMonster(monster: Provokable, state: GameState, region: Regio
   return (x: number, y: number): boolean => {
     if (!isWalkable(region.map, x, y)) return false;
     if (x === state.player.x && y === state.player.y) return true;
-    return !livingActors(state, region).some((a) => a !== monster && a.kind !== 'player' && a.x === x && a.y === y);
+    const occupant = actorAt(state, region, x, y);
+    return occupant === null || occupant === monster;
   };
 }
 
@@ -352,9 +358,8 @@ function wander(monster: Provokable, state: GameState, region: RegionState, rng:
 function tryMoveMonster(monster: Provokable, target: Point, state: GameState, region: RegionState): boolean {
   if (!isWalkable(region.map, target.x, target.y)) return false;
   if (target.x === state.player.x && target.y === state.player.y) return false;
-  if (livingActors(state, region).some((a) => a !== monster && a.kind !== 'player' && a.x === target.x && a.y === target.y)) {
-    return false;
-  }
+  const occupant = actorAt(state, region, target.x, target.y);
+  if (occupant !== null && occupant !== monster) return false;
 
   monster.x = target.x;
   monster.y = target.y;

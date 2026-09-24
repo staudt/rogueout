@@ -3,7 +3,6 @@ import { reserveItemInstanceIds } from '../items/Item';
 import { reserveMonsterInstanceIds } from '../entities/Monster';
 import type { SaveStorage } from './LocalStorageAdapter';
 import { fromSaveData, migrate, toSaveData, type SaveData } from './SaveSchema';
-import { REGIONS } from '../world/regions/RegionRegistry';
 
 /**
  * Single-slot save/load.
@@ -21,8 +20,10 @@ export function saveGame(storage: SaveStorage, state: GameState): boolean {
     storage.write(JSON.stringify(toSaveData(state)));
     return true;
   } catch {
-    // Serialization itself failing (a cycle sneaking into state) would be a bug, but it must not
-    // end the run — the player keeps playing, unsaved.
+    // Storage full or blocked, or serialization itself failing (a cycle sneaking into state,
+    // which would be a bug). Either way it must not end the run — the player keeps playing,
+    // unsaved. Returning false rather than throwing is what lets the caller say so honestly;
+    // the one thing this must never do is report a success that didn't happen.
     return false;
   }
 }
@@ -32,15 +33,12 @@ export function loadGame(storage: SaveStorage): GameState | null {
   const save = migrate(storage.read());
   if (!save) return null;
 
+  // Decoding can still fail on input that passed migrate's structural checks — a grid whose
+  // run lengths don't add up to its own width x height. Same answer as any other unusable save.
   const state = fromSaveData(save);
+  if (!state) return null;
+
   reserveInstanceIds(save);
-
-  // Saves written before regions knew about daylight would otherwise load the overworld as if it
-  // were underground. Cheaper and safer than a schema bump for a field the region table owns.
-  for (const [id, region] of Object.entries(state.regions)) {
-    region.daylight ??= REGIONS[id]?.daylight ?? false;
-  }
-
   return state;
 }
 
@@ -48,9 +46,16 @@ export function clearSave(storage: SaveStorage): void {
   storage.clear();
 }
 
-/** Whether Continue should be offered. Cheap enough to call while building the title screen. */
+/**
+ * Whether Continue should be offered.
+ *
+ * Deliberately the *full* load rather than just a shape check: a save can pass validation and
+ * still fail to decode (a grid whose runs don't add up), and offering Continue for a run that
+ * then refuses to load is the one outcome worse than not offering it. Called once while building
+ * the title screen, so paying for a decode to be sure is easily affordable.
+ */
 export function hasSave(storage: SaveStorage): boolean {
-  return migrate(storage.read()) !== null;
+  return loadGame(storage) !== null;
 }
 
 function reserveInstanceIds(save: SaveData): void {

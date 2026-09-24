@@ -21,9 +21,15 @@ export const SAVE_KEY = 'rogueout:save';
 const LEGACY_SAVE_KEY = 'roguelite:save';
 
 /**
- * localStorage, with every call wrapped: it throws on quota exhaustion and is entirely absent in
- * some privacy modes. A save that can't be written must never take the game down with it — the
- * run is still playable, it just won't survive a reload.
+ * localStorage, with reads and clears wrapped: it throws on quota exhaustion and is entirely
+ * absent in some privacy modes. A save that can't be written must never take the game down with
+ * it — the run is still playable, it just won't survive a reload.
+ *
+ * `write` deliberately does **not** swallow its error. It used to, and the result was worse than
+ * the failure it was hiding: `saveGame` reported success for a write that never happened, and
+ * "Save and quit" told the player their run was safe before discarding it. Failing loudly here
+ * lets `saveGame` return an honest `false` and the caller decide — which is still "keep playing",
+ * just with the player told the truth.
  */
 export function createLocalStorageAdapter(key: string = SAVE_KEY): SaveStorage {
   return {
@@ -35,11 +41,12 @@ export function createLocalStorageAdapter(key: string = SAVE_KEY): SaveStorage {
       }
     },
     write(data: string) {
+      window.localStorage.setItem(key, data);
+      // Only once the real write has succeeded, so a failure can't cost the previous save too.
       try {
-        window.localStorage.setItem(key, data);
         window.localStorage.removeItem(LEGACY_SAVE_KEY);
       } catch {
-        /* out of quota, or storage blocked — the run continues, unsaved. */
+        /* the new key holds the run; the stale one is untidy, not dangerous. */
       }
     },
     clear() {

@@ -28,9 +28,12 @@ function reachableFrom(map: GameMapData, startX: number, startY: number): Set<st
   const seen = new Set<string>([`${startX},${startY}`]);
   const queue: Array<[number, number]> = [[startX, startY]];
 
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) break;
+  // A head index rather than shift(): shift() is O(n) on a JS array, making this flood fill
+  // quadratic in the map's area. Harmless on the 70x30 desert, dominant on a city.
+  let head = 0;
+  while (head < queue.length) {
+    const current = queue[head]!;
+    head += 1;
     const [x, y] = current;
 
     for (const [dx, dy] of NEIGHBOR_OFFSETS) {
