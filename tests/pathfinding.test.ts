@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { findPath, findPathToward } from '../src/pathfinding/BFS';
-import type { Point } from '../src/utils/geometry';
+import { findPath } from '../src/pathfinding/BFS';
+import { walkableLineToward } from '../src/pathfinding/StraightLine';
+import { chebyshevDistance, linePoints, type Point } from '../src/utils/geometry';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { getTileId, isWalkable, type GameMapData } from '../src/world/GameMap';
 import { OVERWORLD_SPAWN } from '../src/world/maps/overworld';
@@ -76,81 +77,64 @@ describe('findPath (BFS)', () => {
   });
 });
 
-describe('findPathToward (heading for somewhere you cannot reach)', () => {
-  it('stops against the wall when the goal is sealed off', () => {
-    const rows = ['.........', '.........', '...###...', '...#.#...', '...###...', '.........'];
-    const isPassable = isPassableFor(rows);
-    const start = { x: 0, y: 0 };
-    const sealed = { x: 4, y: 3 };
+describe('walkableLineToward (heading for somewhere you cannot reach)', () => {
+  it('walks straight at the target and stops at the wall in the way', () => {
+    const rows = ['.......', '...#...', '.......'];
+    const path = walkableLineToward({ x: 0, y: 1 }, { x: 6, y: 1 }, isPassableFor(rows));
 
-    const path = findPathToward(start, sealed, isPassable);
-
-    expect(findPath(start, sealed, isPassable)).toBeNull(); // no route exists
-    expect(path).not.toBeNull();
-    // Closest you can stand to the centre of a walled box is just outside its wall.
-    expect(chebyshev(path!.at(-1)!, sealed)).toBe(2);
-    expect(chebyshev(path!.at(-1)!, sealed)).toBeLessThan(chebyshev(start, sealed));
-    for (const step of path!) expect(isPassable(step.x, step.y)).toBe(true);
+    expect(path).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]); // stops in front of the wall at x=3
   });
 
-  it('does nothing when the player is already as close as the terrain allows', () => {
-    // Every tile outside this box is exactly as far from its centre as the start already is.
-    const rows = ['.....', '.###.', '.#.#.', '.###.', '.....'];
-    expect(findPathToward({ x: 0, y: 0 }, { x: 2, y: 2 }, isPassableFor(rows))).toBeNull();
+  it('runs at an angle, not just along the eight compass directions', () => {
+    const rows = ['.........', '.........', '.........', '.........'];
+    const path = walkableLineToward({ x: 0, y: 0 }, { x: 8, y: 3 }, isPassableFor(rows));
+
+    // A shallow diagonal: every step advances, and the line stays near the ideal slope.
+    expect(path.at(-1)).toEqual({ x: 8, y: 3 });
+    for (let i = 1; i < path.length; i++) {
+      expect(chebyshevDistance(path[i - 1]!, path[i]!)).toBe(1);
+    }
+    for (const step of path) {
+      expect(Math.abs(step.y - (step.x * 3) / 8)).toBeLessThanOrEqual(1);
+    }
   });
 
-  it('walks right up to a wall when the goal is the wall itself', () => {
-    const rows = ['.....', '.....', '..#..'];
-    const path = findPathToward({ x: 0, y: 0 }, { x: 2, y: 2 }, isPassableFor(rows));
+  it('refuses to detour — it stops rather than going around', () => {
+    // The old "closest reachable tile" model would have routed all the way around this wall and
+    // ended up somewhere the player never pointed at. Going straight just stops.
+    const rows = ['...#...', '...#...', '.......'];
+    const path = walkableLineToward({ x: 0, y: 0 }, { x: 6, y: 0 }, isPassableFor(rows));
 
-    expect(path).not.toBeNull();
-    expect(chebyshev(path!.at(-1)!, { x: 2, y: 2 })).toBe(1); // adjacent to it, not on it
+    expect(path).toEqual([{ x: 1, y: 0 }, { x: 2, y: 0 }]);
   });
 
-  it('takes the whole route when the goal actually is reachable', () => {
-    const rows = ['.....', '.....', '.....'];
-    const path = findPathToward({ x: 0, y: 0 }, { x: 4, y: 2 }, isPassableFor(rows));
-
-    expect(path?.at(-1)).toEqual({ x: 4, y: 2 });
+  it('returns nothing when the very first step is blocked', () => {
+    const rows = ['..', '#.'];
+    expect(walkableLineToward({ x: 1, y: 1 }, { x: 0, y: 1 }, isPassableFor(rows))).toEqual([]);
   });
 
-  it('routes around an obstacle to get closer, rather than stopping at it', () => {
-    // The goal sits behind a wall with the only gap far to the left, so getting closer means
-    // going the "wrong" way first. A greedy step-toward-the-target walk could not do this.
-    const rows = ['.......', '.#####.', '.#....#', '.#####.', '.......'];
-    const isPassable = isPassableFor(rows);
+  it('stops next to a creature standing in the way, without stepping onto it', () => {
+    const rows = ['......'];
+    const creature = { x: 3, y: 0 };
+    const isPassable = (x: number, y: number) =>
+      isPassableFor(rows)(x, y) && !(x === creature.x && y === creature.y);
 
-    const path = findPathToward({ x: 0, y: 0 }, { x: 3, y: 2 }, isPassable);
+    const path = walkableLineToward({ x: 0, y: 0 }, { x: 5, y: 0 }, isPassable);
 
-    expect(path).not.toBeNull();
-    expect(path!.at(-1)).toEqual({ x: 3, y: 2 });
-    expect(path!.length).toBeGreaterThan(chebyshev({ x: 0, y: 0 }, { x: 3, y: 2 }));
-    for (const step of path!) expect(isPassable(step.x, step.y)).toBe(true);
+    expect(path.at(-1)).toEqual({ x: 2, y: 0 });
   });
 
-  it('returns null when nothing reachable is any closer than where you stand', () => {
-    // Boxed in: every reachable tile is already as close to the goal as it gets.
-    const rows = ['###', '#.#', '###'];
-    expect(findPathToward({ x: 1, y: 1 }, { x: 9, y: 9 }, isPassableFor(rows))).toBeNull();
+  it('reaches the target when nothing is in the way at all', () => {
+    const rows = ['......', '......'];
+    expect(walkableLineToward({ x: 0, y: 0 }, { x: 5, y: 1 }, isPassableFor(rows)).at(-1)).toEqual({ x: 5, y: 1 });
   });
 
-  it('returns null when asked to approach the tile already underfoot', () => {
-    const rows = ['...', '...', '...'];
-    expect(findPathToward({ x: 1, y: 1 }, { x: 1, y: 1 }, isPassableFor(rows))).toBeNull();
-  });
-
-  it('moves in the goal direction even when the goal is off the map entirely', () => {
-    // Clicking unexplored fog near the edge can name a tile past the map border.
-    const rows = ['.....', '.....', '.....'];
-    const path = findPathToward({ x: 0, y: 1 }, { x: 40, y: 1 }, isPassableFor(rows));
-
-    expect(path?.at(-1)).toEqual({ x: 4, y: 1 }); // as far east as the ground goes
+  it('heads toward a target off the map and stops at the edge', () => {
+    // Clicking fog near a border can name a tile past the map edge.
+    const rows = ['.....'];
+    expect(walkableLineToward({ x: 0, y: 0 }, { x: 40, y: 0 }, isPassableFor(rows)).at(-1)).toEqual({ x: 4, y: 0 });
   });
 });
-
-function chebyshev(a: Point, b: Point): number {
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-}
 
 describe('a creature holding a one-tile crossing (the real overworld)', () => {
   // The stitched road crosses a lake on a causeway exactly one tile wide, so a single creature
@@ -185,17 +169,18 @@ describe('a creature holding a one-tile crossing (the real overworld)', () => {
     expect(findPath(OVERWORLD_SPAWN, FAR_SIDE, passableExcept(map, CAUSEWAY))).toBeNull();
   });
 
-  it('still walks the player to the water\'s edge instead of refusing', () => {
+  it('still sets off toward it, in a straight line, instead of refusing', () => {
     const map = overworld();
     const isPassable = passableExcept(map, CAUSEWAY);
 
-    const approach = findPathToward(OVERWORLD_SPAWN, FAR_SIDE, isPassable);
+    const path = walkableLineToward(OVERWORLD_SPAWN, FAR_SIDE, isPassable);
 
-    expect(approach).not.toBeNull();
-    const arrival = approach!.at(-1)!;
-    for (const step of approach!) expect(isPassable(step.x, step.y)).toBe(true);
-    // Meaningfully closer than where they started, and stopped short of the blocked tile.
-    expect(chebyshev(arrival, FAR_SIDE)).toBeLessThan(chebyshev(OVERWORLD_SPAWN, FAR_SIDE));
-    expect(arrival).not.toEqual(CAUSEWAY);
+    expect(path.length).toBeGreaterThan(0);
+    for (const step of path) expect(isPassable(step.x, step.y)).toBe(true);
+    // Closer than where they started, and every step is on the straight line to the target —
+    // no wandering off around the lake.
+    expect(chebyshevDistance(path.at(-1)!, FAR_SIDE)).toBeLessThan(chebyshevDistance(OVERWORLD_SPAWN, FAR_SIDE));
+    const line = new Set(linePoints(OVERWORLD_SPAWN, FAR_SIDE).map((p) => `${p.x},${p.y}`));
+    for (const step of path) expect(line.has(`${step.x},${step.y}`)).toBe(true);
   });
 });

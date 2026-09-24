@@ -12,7 +12,8 @@ import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import { OVERWORLD_SPAWN } from '../world/maps/overworld';
 import { isWalkable } from '../world/GameMap';
 import { isExplored, isVisible } from '../fov/VisibilityState';
-import { findPath, findPathToward } from '../pathfinding/BFS';
+import { findPath } from '../pathfinding/BFS';
+import { walkableLineToward } from '../pathfinding/StraightLine';
 import { AutoTravel } from '../pathfinding/AutoTravel';
 import type { GameState, RegionState } from './GameState';
 import { addMessage, getActiveRegion } from './GameState';
@@ -204,29 +205,18 @@ export class Game {
       return;
     }
 
-    // No route to the tile itself. Either way the answer is to set off and get as close as the
-    // ground allows — what differs is whether the player has earned an explanation.
-    const known = isExplored(region.visibility, target.x, target.y);
-
-    // A wall they can already see needs no reply at all: they clicked a wall on purpose.
-    if (known && !isWalkable(region.map, target.x, target.y)) return;
-
-    const approach = findPathToward(player, target, isPassable);
-    if (!approach || approach.length === 0) {
-      // Nowhere closer to stand. Only worth saying when they know the terrain; for unseen ground
-      // it would be telling them something they haven't discovered.
-      if (known) {
-        addMessage(this.state, "You can't find a path there.");
-        this.render();
-      }
+    // A wall they can already see is a deliberate click on a wall: do nothing, say nothing.
+    if (isExplored(region.visibility, target.x, target.y) && !isWalkable(region.map, target.x, target.y)) {
       return;
     }
 
-    // Explored ground with no route — a creature holding a one-tile bridge, an island across a
-    // lake. Say why, then walk to the near side rather than refusing to move at all.
-    if (known) addMessage(this.state, "You can't find a way through, so you head as close as you can.");
+    // No route. Head straight at it and stop at whatever is in the way — predictable, unlike
+    // routing to the nearest reachable tile, which can march you the long way round a lake and
+    // leave you somewhere you never pointed at. No message either: where you stop shows why.
+    const direct = walkableLineToward(player, target, isPassable);
+    if (direct.length === 0) return;
 
-    this.autoTravel.start(approach);
+    this.autoTravel.start(direct);
     this.stepAutoTravel();
   }
 

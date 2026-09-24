@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fbm2D, valueNoise2D } from '../src/world/generation/noise';
 import { generateWilderness, terrainAt } from '../src/world/generation/wilderness';
-import { carveCorridor, linePoints } from '../src/world/generation/stitching';
+import { carveCorridor } from '../src/world/generation/stitching';
 import { reachableWalkable, sealDisconnectedAreas } from '../src/world/generation/connectivity';
 import { scatterPois } from '../src/world/generation/poi';
 import { createGameMap, getTileId, isWalkable, setTileId } from '../src/world/GameMap';
@@ -9,7 +9,7 @@ import { TILES } from '../src/world/Tile';
 import { ITEMS } from '../src/items/ItemData';
 import { MONSTERS } from '../src/entities/MonsterData';
 import { createRNG } from '../src/utils/RNG';
-import { chebyshevDistance } from '../src/utils/geometry';
+import { chebyshevDistance, linePoints } from '../src/utils/geometry';
 import {
   generateOverworld,
   OVERWORLD_DUNGEON_ENTRANCE,
