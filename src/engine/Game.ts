@@ -1,6 +1,12 @@
 import { createPlayer, recomputePlayerCombatStats } from '../entities/Player';
-import { createRNG } from '../utils/RNG';
-import { chebyshevDistance, directionBetween, DIRECTION_VECTORS, type Point } from '../utils/geometry';
+import { createRNG, type RNG } from '../utils/RNG';
+import {
+  chebyshevDistance,
+  directionBetween,
+  DIRECTION_VECTORS,
+  type Direction,
+  type Point,
+} from '../utils/geometry';
 import { joinWithAnd, withArticle } from '../utils/text';
 import { createItem } from '../items/Item';
 import { ITEMS } from '../items/ItemData';
@@ -14,14 +20,20 @@ import { isWalkable } from '../world/GameMap';
 import { isExplored } from '../fov/VisibilityState';
 import { findPath } from '../pathfinding/BFS';
 import { walkableLineToward } from '../pathfinding/StraightLine';
+import { flingItem, kickCreature } from '../combat/Kick';
 import { AutoTravel } from '../pathfinding/AutoTravel';
 import type { GameState, RegionState } from './GameState';
-import { addMessage, canSpot, getActiveRegion } from './GameState';
+import { addMessage, canSpot, endMessageGroup, getActiveRegion } from './GameState';
 import { EventBus, type GameEvents } from './EventBus';
 import { TurnManager } from './TurnManager';
 import { InputManager, type ActionKey } from '../input/InputManager';
 import { MouseInput } from '../input/MouseInput';
-import { AUTO_TRAVEL_STEP_MS } from '../config/constants';
+import {
+  AUTO_TRAVEL_STEP_MS,
+  KICK_ITEM_RANGE,
+  MAX_TRAVEL_DISTANCE,
+  THROW_RANGE,
+} from '../config/constants';
 import { Camera } from '../ui/Camera';
 import { Renderer } from '../ui/Renderer';
 import { MessageLog } from '../ui/MessageLog';
@@ -37,8 +49,15 @@ type ShopAction =
   | { kind: 'buy'; defId: string; price: number }
   | { kind: 'sell'; itemId: string; price: number };
 
+/** What you can do with one item, once you've picked it out of your pack. */
+type ItemAction = 'use' | 'wield' | 'wear' | 'throw' | 'drop';
+
 type CommandAction =
   | 'pickup'
+  | 'kick'
+  | 'go'
+  | 'throw'
+  | 'drop'
   | 'descend'
   | 'climb'
   | 'inventory'
@@ -74,6 +93,8 @@ export class Game {
   /** Guards against pushing the game-over screen more than once for the same death. */
   private gameOverShown = false;
   private resizeFrameId: number | null = null;
+  /** For effects Game resolves itself (kicks, throws) rather than routing through TurnManager. */
+  private rng: RNG = createRNG(Date.now());
   private readonly storage: SaveStorage;
 
   constructor(
@@ -102,11 +123,13 @@ export class Game {
 
     this.input = new InputManager({
       onDirection: (direction) => {
+        endMessageGroup(this.state);
         this.cancelAutoTravel();
         this.turnManager.tryMovePlayer(direction);
         this.render();
       },
       onAction: (key) => {
+        endMessageGroup(this.state);
         this.cancelAutoTravel();
         this.handleAction(key);
       },
@@ -152,7 +175,8 @@ export class Game {
   private adoptState(state: GameState): void {
     this.state = state;
     this.gameOverShown = false;
-    this.turnManager = new TurnManager(this.state, this.events, createRNG(Date.now()));
+    this.rng = createRNG(Date.now());
+    this.turnManager = new TurnManager(this.state, this.events, this.rng);
     this.turnManager.recomputeFOV();
   }
 
@@ -175,6 +199,7 @@ export class Game {
 
   private handleMapClick(target: Point): void {
     if (this.state.gameOver || this.screens.isOpen()) return;
+    endMessageGroup(this.state);
     this.cancelAutoTravel();
 
     const player = this.state.player;
@@ -260,6 +285,7 @@ export class Game {
 
   private stepAutoTravel(): void {
     this.autoTravelTimerId = null;
+    endMessageGroup(this.state); // each step of a walk is its own line
     if (!this.autoTravel.isActive() || this.state.gameOver) {
       this.autoTravel.cancel();
       return;
@@ -412,7 +438,158 @@ export class Game {
       case 'C':
         this.openCharacterSheet();
         break;
+      case 'k':
+        this.promptDirection('Kick in which direction?', (direction) => this.kick(direction));
+        break;
+      case 'g':
+        this.promptDirection('Go in which direction?', (direction) => this.travelInDirection(direction));
+        break;
+      case 't':
+        this.openThrowMenu();
+        break;
+      case 'd':
+        this.openDropMenu();
+        break;
     }
+  }
+
+  /**
+   * Asks which way, then does the thing. The prompt goes in the log rather than a menu so the map
+   * stays visible — you need to see what you're aiming at.
+   */
+  private promptDirection(prompt: string, action: (direction: Direction) => void): void {
+    if (this.state.gameOver) return;
+    addMessage(this.state, prompt);
+    // The answer starts a fresh line: the question is history the moment it's answered.
+    endMessageGroup(this.state);
+    this.render();
+
+    this.input.promptDirection((direction) => {
+      if (!direction) {
+        addMessage(this.state, 'Never mind.');
+        this.render();
+        return;
+      }
+      action(direction);
+    });
+  }
+
+  /** `k`: boot whatever is in that direction — a creature, a loose object, or a wall. */
+  private kick(direction: Direction): void {
+    const region = getActiveRegion(this.state);
+    const vector = DIRECTION_VECTORS[direction];
+    const target = { x: this.state.player.x + vector.x, y: this.state.player.y + vector.y };
+
+    const monster = region.monsters.find((m) => m.hp > 0 && m.x === target.x && m.y === target.y);
+    if (monster) {
+      const outcome = kickCreature(monster, direction, this.state, region, this.rng);
+      if (outcome.tookTurn) this.turnManager.advanceTurn();
+      this.render();
+      return;
+    }
+
+    const groundIndex = region.groundItems.findIndex((g) => g.x === target.x && g.y === target.y);
+    if (groundIndex !== -1) {
+      const [ground] = region.groundItems.splice(groundIndex, 1);
+      if (ground) {
+        const def = ITEMS[ground.item.defId];
+        addMessage(this.state, `You kick the ${def?.name ?? 'item'}.`);
+        // A boot is a worse arm than a hand: shorter range than a throw.
+        const result = flingItem(
+          ground.item.defId,
+          target,
+          direction,
+          KICK_ITEM_RANGE,
+          def?.damage,
+          this.state,
+          region,
+          this.rng,
+        );
+        region.groundItems.push({ item: ground.item, x: result.landedAt.x, y: result.landedAt.y });
+      }
+      this.turnManager.advanceTurn();
+      this.render();
+      return;
+    }
+
+    if (!isWalkable(region.map, target.x, target.y)) {
+      addMessage(this.state, 'You kick the wall. That was a mistake.');
+      this.turnManager.advanceTurn();
+    } else {
+      addMessage(this.state, 'You kick at nothing.'); // costs no turn: an obvious misfire
+    }
+    this.render();
+  }
+
+  /**
+   * `g`: walk that way until something stops you. Reuses the click-to-travel machinery, so every
+   * interrupt (a creature coming into view, taking damage, the ground running out) applies.
+   */
+  private travelInDirection(direction: Direction): void {
+    const region = getActiveRegion(this.state);
+    const vector = DIRECTION_VECTORS[direction];
+    const far = {
+      x: this.state.player.x + vector.x * MAX_TRAVEL_DISTANCE,
+      y: this.state.player.y + vector.y * MAX_TRAVEL_DISTANCE,
+    };
+
+    const path = walkableLineToward(this.state.player, far, this.isPassableIn(region));
+    if (path.length === 0) {
+      addMessage(this.state, 'You can\'t go that way.');
+      this.render();
+      return;
+    }
+
+    this.autoTravel.start(path);
+    this.stepAutoTravel();
+  }
+
+  private throwItem(itemId: string, direction: Direction): void {
+    const player = this.state.player;
+    const item = player.inventory.find((i) => i.id === itemId);
+    const def = item ? ITEMS[item.defId] : undefined;
+    if (!item || !def) return;
+
+    const region = getActiveRegion(this.state);
+    if (player.equipment.weapon?.id === item.id) player.equipment.weapon = null;
+    if (player.equipment.armor?.id === item.id) player.equipment.armor = null;
+
+    const thrown = consumeOne(player.inventory, item.id) ? { ...item, quantity: 1 } : item;
+    recomputePlayerCombatStats(player);
+
+    addMessage(this.state, `You throw the ${def.name}.`);
+    const result = flingItem(
+      item.defId,
+      player,
+      direction,
+      THROW_RANGE,
+      def.damage,
+      this.state,
+      region,
+      this.rng,
+    );
+    region.groundItems.push({ item: thrown, x: result.landedAt.x, y: result.landedAt.y });
+
+    this.turnManager.advanceTurn();
+    this.render();
+  }
+
+  private dropItem(itemId: string): void {
+    const player = this.state.player;
+    const item = player.inventory.find((i) => i.id === itemId);
+    const def = item ? ITEMS[item.defId] : undefined;
+    if (!item || !def) return;
+
+    if (player.equipment.weapon?.id === item.id) player.equipment.weapon = null;
+    if (player.equipment.armor?.id === item.id) player.equipment.armor = null;
+    removeItem(player.inventory, item.id);
+    recomputePlayerCombatStats(player);
+
+    getActiveRegion(this.state).groundItems.push({ item, x: player.x, y: player.y });
+    addMessage(this.state, `You drop the ${def.name}.`);
+
+    this.turnManager.advanceTurn();
+    this.render();
   }
 
   private openCommandMenu(): void {
@@ -438,6 +615,10 @@ export class Game {
       { label: 'Wield weapon', value: 'wield', hint: '[w]' },
       { label: 'Wear armor', value: 'wear', hint: '[W]' },
       { label: 'Use/Quaff', value: 'use', hint: '[q]' },
+      { label: 'Throw', value: 'throw', hint: '[t]' },
+      { label: 'Drop', value: 'drop', hint: '[d]' },
+      { label: 'Kick', value: 'kick', hint: '[k]' },
+      { label: 'Go until something happens', value: 'go', hint: '[g]' },
       { label: 'Fire', value: 'fire', hint: '[f]' },
       { label: 'Wait a turn', value: 'wait', hint: '[.]' },
       { label: 'Character sheet', value: 'character', hint: '[C]' },
@@ -496,6 +677,20 @@ export class Game {
       case 'character':
         this.openCharacterSheet();
         break;
+      case 'throw':
+        this.openThrowMenu();
+        break;
+      case 'drop':
+        this.openDropMenu();
+        break;
+      case 'kick':
+        this.screens.closeAll();
+        this.promptDirection('Kick in which direction?', (direction) => this.kick(direction));
+        break;
+      case 'go':
+        this.screens.closeAll();
+        this.promptDirection('Go in which direction?', (direction) => this.travelInDirection(direction));
+        break;
     }
   }
 
@@ -537,9 +732,11 @@ export class Game {
       label: describeItem(item, this.state.player.equipment),
       value: item.id,
     }));
-    // No onSelect: the inventory is a read-only list, so Enter falls through to ScreenManager's
-    // default (pop), same as Esc.
-    this.screens.push<string>({ title: 'Inventory', options });
+    this.screens.push<string>({
+      title: 'Inventory',
+      options,
+      onSelect: (itemId) => this.openItemActions(itemId),
+    });
   }
 
   private openWieldMenu(): void {
@@ -575,6 +772,76 @@ export class Game {
       title: 'Use/Quaff — pick an item',
       options,
       onSelect: (itemId) => this.useItem(itemId),
+    });
+  }
+
+  /** `t`: pick something, then a direction. */
+  private openThrowMenu(): void {
+    const options = this.state.player.inventory.map((item) => ({
+      label: describeItem(item, this.state.player.equipment),
+      value: item.id,
+    }));
+    this.screens.push<string>({
+      title: 'Throw what?',
+      options,
+      onSelect: (itemId) => {
+        this.screens.closeAll();
+        this.promptDirection('Throw in which direction?', (direction) => this.throwItem(itemId, direction));
+      },
+    });
+  }
+
+  private openDropMenu(): void {
+    const options = this.state.player.inventory.map((item) => ({
+      label: describeItem(item, this.state.player.equipment),
+      value: item.id,
+    }));
+    this.screens.push<string>({
+      title: 'Drop what?',
+      options,
+      onSelect: (itemId) => {
+        this.screens.closeAll();
+        this.dropItem(itemId);
+      },
+    });
+  }
+
+  /**
+   * What you can do with one item, offered only where it makes sense — there's no point asking
+   * whether you'd like to wear a med pack. Reached by choosing an item in the inventory.
+   */
+  private openItemActions(itemId: string): void {
+    const item = this.state.player.inventory.find((i) => i.id === itemId);
+    const def = item ? ITEMS[item.defId] : undefined;
+    if (!item || !def) return;
+
+    const equipped =
+      this.state.player.equipment.weapon?.id === item.id || this.state.player.equipment.armor?.id === item.id;
+
+    const options: MenuOption<ItemAction>[] = [];
+    if (def.healAmount !== undefined) options.push({ label: 'Use', value: 'use', hint: '[q]' });
+    if (def.category === 'weapon') {
+      options.push({ label: equipped ? 'Put away' : 'Wield', value: 'wield', hint: '[w]' });
+    }
+    if (def.category === 'armor') {
+      options.push({ label: equipped ? 'Take off' : 'Wear', value: 'wear', hint: '[W]' });
+    }
+    options.push({ label: 'Throw', value: 'throw', hint: '[t]' }, { label: 'Drop', value: 'drop', hint: '[d]' });
+
+    this.screens.push<ItemAction>({
+      title: def.name,
+      options,
+      onSelect: (action) => {
+        if (action === 'throw') {
+          this.screens.closeAll();
+          this.promptDirection('Throw in which direction?', (direction) => this.throwItem(itemId, direction));
+          return;
+        }
+        this.screens.closeAll();
+        if (action === 'use') this.useItem(itemId);
+        else if (action === 'drop') this.dropItem(itemId);
+        else this.toggleEquip(itemId);
+      },
     });
   }
 

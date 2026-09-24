@@ -32,3 +32,23 @@ export const NORMAL_SPEED = 12;
 
 /** A hard stop on actions per creature per turn, so a silly speed value can't hang the game. */
 export const MAX_ACTIONS_PER_TURN = 8;
+
+/** Creature weight (kg-ish) when a definition doesn't say — roughly a person. */
+export const DEFAULT_WEIGHT = 70;
+
+/**
+ * How far a kick throws something, by weight. Light things tumble, people take a step, and
+ * anything heavier than the last threshold just stands there and is now annoyed.
+ */
+export const KNOCKBACK_BY_WEIGHT: ReadonlyArray<readonly [maxWeight: number, tiles: number]> = [
+  [5, 3],
+  [20, 2],
+  [90, 1],
+];
+
+/** How far a thrown object flies, and how much worse a boot is than an arm. */
+export const THROW_RANGE = 6;
+export const KICK_ITEM_RANGE = 3;
+
+/** Upper bound for "walk that way until something happens" — larger than any map. */
+export const MAX_TRAVEL_DISTANCE = 200;

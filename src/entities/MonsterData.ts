@@ -35,6 +35,11 @@ export interface MonsterDef {
   awarenessRadius: number;
   /** What it leaves behind. Humans carry their gear; animals don't.  */
   drops?: MonsterDrop[];
+  /**
+   * Roughly kilograms. Only knockback reads it: a kicked skink tumbles, a kicked trooper takes
+   * one step back, and something heavy enough doesn't move at all. Omitted means human-ish.
+   */
+  weight?: number;
 }
 
 /**
@@ -45,6 +50,7 @@ export interface MonsterDef {
 export const MONSTERS: Record<string, MonsterDef> = {
   dustRat: {
     id: 'dustRat',
+    weight: 4,
     name: 'dust rat',
     glyph: 'r',
     fg: '#c08552',
@@ -63,6 +69,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   /** Teaches that not everything out here is a fight. Quick, and runs rather than swings. */
   sandSkink: {
     id: 'sandSkink',
+    weight: 3,
     name: 'sand skink',
     glyph: 'l',
     fg: '#d2b48c',
@@ -82,6 +89,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   /** The bigger lizard that does hunt you. Fast enough that open ground stops being safe. */
   duneRunner: {
     id: 'duneRunner',
+    weight: 45,
     name: 'dune runner',
     glyph: 'L',
     fg: '#b8860b',
@@ -107,6 +115,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
    */
   paleScorpion: {
     id: 'paleScorpion',
+    weight: 15,
     name: 'pale scorpion',
     glyph: 's',
     fg: '#e8e0c0',
@@ -132,6 +141,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
    */
   feralGhoul: {
     id: 'feralGhoul',
+    weight: 60,
     name: 'feral ghoul',
     glyph: 'g',
     fg: '#7a8f5a',
@@ -152,6 +162,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   /** Armed, armoured, and carrying the upgrade you're about to be using. */
   wakeRaider: {
     id: 'wakeRaider',
+    weight: 75,
     name: 'Wake raider',
     glyph: '@',
     fg: '#d06060',
@@ -176,6 +187,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   /** The other side of the war. Better armoured, and not your problem unless you make it one. */
   restorationTrooper: {
     id: 'restorationTrooper',
+    weight: 85,
     name: 'Restoration trooper',
     glyph: '@',
     fg: '#c8b88a',
@@ -203,6 +215,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
    */
   crawlingMold: {
     id: 'crawlingMold',
+    weight: 25,
     name: 'crawling mold',
     glyph: 'm',
     fg: '#8bc34a',

@@ -18,7 +18,7 @@ function isArrowKey(key: string): key is ArrowKey {
  * f fire, . wait, > descend, < climb. `C` (character sheet) is not a NetHack key — NetHack uses
  * ^X — but a plain letter is friendlier and ^X is awkward to type in a browser.
  */
-export type ActionKey = ',' | 'w' | 'W' | 'q' | 'i' | 'f' | '.' | '>' | '<' | 'C';
+export type ActionKey = ',' | 'w' | 'W' | 'q' | 'i' | 'f' | '.' | '>' | '<' | 'C' | 'k' | 'g' | 'd' | 't';
 const ACTION_KEYS: ReadonlySet<string> = new Set<ActionKey>([
   ',',
   'w',
@@ -30,6 +30,10 @@ const ACTION_KEYS: ReadonlySet<string> = new Set<ActionKey>([
   '>',
   '<',
   'C',
+  'k', // kick
+  'g', // go: travel in a direction until something happens
+  'd', // drop
+  't', // throw
 ]);
 
 function isActionKey(key: string): key is ActionKey {
@@ -59,6 +63,7 @@ export class InputManager {
   private readonly detector: KeyChordDetector;
   private readonly callbacks: InputCallbacks;
   private menuActive = false;
+  private directionPrompt: ((direction: Direction | null) => void) | null = null;
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (this.menuActive) {
@@ -85,6 +90,15 @@ export class InputManager {
     }
 
     if (event.repeat) return;
+
+    // While a direction is pending, every other key cancels it rather than doing its own thing.
+    if (this.directionPrompt) {
+      event.preventDefault();
+      const prompt = this.directionPrompt;
+      this.directionPrompt = null;
+      prompt(null);
+      return;
+    }
 
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -119,8 +133,29 @@ export class InputManager {
   constructor(callbacks: InputCallbacks) {
     this.callbacks = callbacks;
     this.detector = new KeyChordDetector((direction) => {
+      // A pending "which way?" swallows the next direction instead of moving. Routed through the
+      // chord detector rather than raw key-downs so kicking or throwing diagonally works exactly
+      // like walking diagonally does.
+      const prompt = this.directionPrompt;
+      if (prompt) {
+        this.directionPrompt = null;
+        prompt(direction);
+        return;
+      }
       if (!this.menuActive) callbacks.onDirection(direction);
     }, DIAGONAL_CHORD_WINDOW_MS);
+  }
+
+  /**
+   * Asks for a direction: the next movement input is delivered to `resolve` instead of moving the
+   * player, and Escape delivers null. Shared by kick, throw and travel-in-a-direction.
+   */
+  promptDirection(resolve: (direction: Direction | null) => void): void {
+    this.directionPrompt = resolve;
+  }
+
+  isAwaitingDirection(): boolean {
+    return this.directionPrompt !== null;
   }
 
   /** Switches between movement/action-key dispatch and menu-navigation dispatch. */

@@ -2,7 +2,7 @@ import type { Entity } from './Entity';
 import type { Combatant } from '../combat/Combatant';
 import type { MonsterBehavior, MonsterDef } from './MonsterData';
 import type { FactionId } from '../world/Factions';
-import { NORMAL_SPEED } from '../config/constants';
+import { DEFAULT_WEIGHT, NORMAL_SPEED } from '../config/constants';
 
 export interface Monster extends Entity, Combatant {
   readonly kind: 'monster';
@@ -20,6 +20,8 @@ export interface Monster extends Entity, Combatant {
    * Per-creature, not per-faction: spearing one lizard does not turn every lizard against you.
    */
   provokedBy: FactionId[];
+  /** Roughly kilograms; read by knockback. */
+  weight: number;
 }
 
 let nextInstanceId = 0;
@@ -61,5 +63,6 @@ export function createMonster(def: MonsterDef, x: number, y: number): Monster {
     speed: def.speed ?? NORMAL_SPEED,
     energy: 0,
     provokedBy: [],
+    weight: def.weight ?? DEFAULT_WEIGHT,
   };
 }

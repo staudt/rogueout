@@ -32,15 +32,41 @@ export interface GameState {
   turnCount: number;
   messageLog: string[];
   gameOver: boolean;
+  /**
+   * Transient (not saved): whether messages are still accumulating onto the current line.
+   * Everything that happens in response to one player action belongs on one line — your swing
+   * and the answering blow read as an exchange, not as two unrelated events.
+   */
+  messageGroupOpen?: boolean;
 }
 
 const MAX_MESSAGE_LOG = 200;
 
+/** Past this, a busy turn starts a fresh line rather than running off the edge of the log. */
+const MAX_GROUPED_LINE = 160;
+
 export function addMessage(state: GameState, message: string): void {
-  state.messageLog.push(message);
+  const last = state.messageLog[state.messageLog.length - 1];
+
+  if (state.messageGroupOpen && last !== undefined && last.length + message.length + 1 <= MAX_GROUPED_LINE) {
+    state.messageLog[state.messageLog.length - 1] = `${last} ${message}`;
+  } else {
+    state.messageLog.push(message);
+    state.messageGroupOpen = true;
+  }
+
   if (state.messageLog.length > MAX_MESSAGE_LOG) {
     state.messageLog.shift();
   }
+}
+
+/**
+ * Starts a fresh log line. Called when the player does something new, rather than at the end of a
+ * turn — that way anything the world does in reply stays attached to what provoked it, and a
+ * failed action that consumed no turn doesn't leave the line hanging open for the next one.
+ */
+export function endMessageGroup(state: GameState): void {
+  state.messageGroupOpen = false;
 }
 
 /**

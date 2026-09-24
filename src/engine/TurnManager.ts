@@ -23,6 +23,7 @@ import { withArticle } from '../utils/text';
 import {
   narrateCondition,
   narratePlayerAttack,
+  narrateResisted,
   narrateWaiting,
   UNARMED_VERB,
 } from '../narrative/Narration';
@@ -228,6 +229,13 @@ export class TurnManager {
         seed: this.state.turnCount,
       }),
     );
+
+    if (result.resisted) {
+      addMessage(
+        this.state,
+        narrateResisted(def?.name ?? 'creature', weaponDef?.attackVerb ?? UNARMED_VERB, this.state.turnCount),
+      );
+    }
 
     if (result.hit && !result.shrugged) {
       const condition = narrateCondition(monster.hp, monster.maxHp);

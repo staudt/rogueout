@@ -166,6 +166,20 @@ export function narrateCondition(hp: number, maxHp: number): string | null {
 }
 
 /** Said once, as the player crosses into trouble — not repeated every turn after. */
+const RESISTED: readonly string[] = [
+  'Your {verb} barely gets through.',
+  'The {target} turns most of it.',
+  'Wrong tool for the {target}.',
+];
+
+/**
+ * Said when most of a blow was turned away. Without it the damage system is invisible: the player
+ * sees small numbers and concludes they're unlucky rather than badly equipped.
+ */
+export function narrateResisted(target: string, verb: string, seed: number): string {
+  return fill(pickPhrase(RESISTED, seed), { target, verb });
+}
+
 export const PLAYER_BADLY_HURT = 'You are badly hurt.';
 
 export const PLAYER_DEATH = 'You are dead.';

@@ -56,6 +56,11 @@ export interface DamageRoll {
   byType: Partial<Record<DamageType, number>>;
   /** True when every component was fully resisted: the blow landed and did nothing at all. */
   shrugged: boolean;
+  /**
+   * How much the defender turned, 0..1. Anything high means the player is swinging the wrong
+   * thing and should be told so — that's the entire point of having damage types.
+   */
+  resistedFraction: number;
 }
 
 /**
@@ -88,7 +93,9 @@ export function rollTypedDamage(
 
   const byType: Partial<Record<DamageType, number>> = {};
   let raw = 0;
+  let unresisted = 0;
   for (const { type, amount } of rolled) {
+    unresisted += amount;
     const through = amount * resistanceMultiplier(resistances, type);
     if (through <= 0) continue;
     byType[type] = (byType[type] ?? 0) + through;
@@ -100,7 +107,12 @@ export function rollTypedDamage(
     byType[type] = Math.max(1, Math.floor(byType[type]!));
   }
 
-  return { total, byType, shrugged: packets.length > 0 && total === 0 };
+  return {
+    total,
+    byType,
+    shrugged: packets.length > 0 && total === 0,
+    resistedFraction: unresisted > 0 ? Math.max(0, 1 - raw / unresisted) : 0,
+  };
 }
 
 /** The type that did the most damage — what the log should describe the blow as. */

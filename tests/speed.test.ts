@@ -87,8 +87,9 @@ describe('speed', () => {
 
     runMonsterTurns(state, createRNG(5));
 
-    const blows = state.messageLog.filter((line) => /hits you|connects|lands a hit|tears into|slams|clips|grazes|catches you/.test(line));
-    expect(blows.length).toBe(2);
+    // Counted across the text, not per line: everything from one player turn shares a line now.
+    const blows = state.messageLog.join(' ').match(/hits you|connects|lands a hit|tears into|slams|clips you|grazes you|catches you/g);
+    expect(blows).toHaveLength(2);
   });
 
   it('is bounded, so an absurd speed cannot hang the turn', () => {
