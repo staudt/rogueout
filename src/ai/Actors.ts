@@ -2,12 +2,18 @@ import type { Monster } from '../entities/Monster';
 import type { Npc } from '../entities/Npc';
 import type { Player } from '../entities/Player';
 import type { GameState, RegionState } from '../engine/GameState';
-import { addMessage } from '../engine/GameState';
+import { addMessage, canSpot } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { chebyshevDistance, type Point } from '../utils/geometry';
 import { FACTIONS, standingBetween, type FactionId } from '../world/Factions';
-import { ALERT_RADIUS, ALARM_RADIUS, CORPSE_NOTICE_RADIUS, WITNESS_RADIUS } from '../config/constants';
-import { isVisible } from '../fov/VisibilityState';
+import {
+  ALERT_RADIUS,
+  ALARM_RADIUS,
+  CORPSE_NOTICE_RADIUS,
+  HEARING_RADIUS,
+  WITNESS_RADIUS,
+} from '../config/constants';
+import { narrateDistantShout, narrateShout } from '../narrative/Shouts';
 
 /**
  * Everything that can be hit, hunted, or take a turn — the player, creatures, and people.
@@ -226,7 +232,7 @@ export function noticeCorpses(state: GameState, region: RegionState, finder: Pro
 
     if (provoke(finder, corpse.killedBy)) {
       alertAllies(region, finder, corpse.killedBy);
-      if (isVisible(region.visibility, finder.x, finder.y)) {
+      if (canSpot(state, finder.x, finder.y)) {
         addMessage(state, `${actorLabel(finder)} finds ${corpse.name} dead.`.replace(/^./, (c) => c.toUpperCase()));
       }
       return true;
@@ -255,7 +261,12 @@ export function callOutEnemy(
 
   raiseAlarm(region, spotter, spotter.faction, enemyFaction);
 
-  if (isVisible(region.visibility, spotter.x, spotter.y)) {
-    addMessage(state, `${actorLabel(spotter)} shouts a warning.`.replace(/^./, (c) => c.toUpperCase()));
+  // What you get depends on whether you can see who's shouting. Close enough to make them out and
+  // you hear the words; otherwise it's a voice somewhere off to the east, which is all a shout
+  // over a ridge ever is.
+  if (canSpot(state, spotter.x, spotter.y)) {
+    addMessage(state, narrateShout(spotter.faction, enemyFaction, state.turnCount));
+  } else if (chebyshevDistance(state.player, spotter) <= HEARING_RADIUS) {
+    addMessage(state, narrateDistantShout(state.player, spotter, state.turnCount));
   }
 }

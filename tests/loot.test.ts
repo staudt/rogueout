@@ -171,7 +171,7 @@ describe('calling out an enemy', () => {
     callOutEnemy(state, r, spotter, 'wake');
     callOutEnemy(state, r, spotter, 'wake');
 
-    expect(state.messageLog.join(' ').match(/shouts a warning/g)).toHaveLength(1);
+    expect(state.messageLog).toHaveLength(1); // one shout, whatever words it picked
   });
 
   it('animals do not shout', () => {
@@ -183,7 +183,7 @@ describe('calling out an enemy', () => {
     callOutEnemy(state, r, lizard, 'player');
 
     expect(lizard.calledOut).toBeFalsy();
-    expect(state.messageLog.join(' ')).not.toMatch(/shouts/);
+    expect(state.messageLog).toEqual([]);
   });
 });
 

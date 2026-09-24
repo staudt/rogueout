@@ -83,3 +83,13 @@ export const CORPSE_NOTICE_RADIUS = 3;
 
 /** How far a scavenger will go out of its way for something lying on the ground. */
 export const SCAVENGE_RADIUS = 8;
+
+/**
+ * How far the noise of a fight carries.
+ *
+ * Deliberately far larger than `computeSpotRadius` (about 14 for average Perception). Sound
+ * beating sight by a couple of tiles would make "you hear fighting somewhere east" a thing you
+ * essentially never saw; at this range there's a wide band of the map where a war is audible and
+ * illegible, which is the point.
+ */
+export const HEARING_RADIUS = 34;

@@ -1,9 +1,8 @@
 import type { GameState, RegionState } from '../engine/GameState';
-import { addMessage } from '../engine/GameState';
+import { addMessage, canSpot } from '../engine/GameState';
 import { ITEMS } from '../items/ItemData';
 import type { Item } from '../items/Item';
 import { MONSTERS } from '../entities/MonsterData';
-import { isVisible } from '../fov/VisibilityState';
 import { actorLabel, type Provokable } from './Actors';
 
 /**
@@ -39,7 +38,7 @@ export function scavengeHere(state: GameState, region: RegionState, actor: Provo
   actor.carried = [...(actor.carried ?? []), ground.item];
   equipIfBetter(actor, ground.item);
 
-  if (isVisible(region.visibility, actor.x, actor.y)) {
+  if (canSpot(state, actor.x, actor.y)) {
     const name = ITEMS[ground.item.defId]?.name ?? 'something';
     addMessage(state, `${actorLabel(actor)} picks up the ${name}.`.replace(/^./, (c) => c.toUpperCase()));
   }

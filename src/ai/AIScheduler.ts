@@ -1,5 +1,5 @@
 import type { GameState, RegionState } from '../engine/GameState';
-import { addMessage, getActiveRegion } from '../engine/GameState';
+import { addMessage, canSpot, getActiveRegion } from '../engine/GameState';
 import { randomInt, type RNG } from '../utils/RNG';
 import { addPoints, chebyshevDistance, DIRECTION_VECTORS, type Direction, type Point } from '../utils/geometry';
 import { isWalkable } from '../world/GameMap';
@@ -28,10 +28,11 @@ import {
   type Actor,
   type Provokable,
 } from './Actors';
-import { isVisible } from '../fov/VisibilityState';
+import { narrateDistantFighting } from '../narrative/Shouts';
 import {
   DETOUR_NODE_BUDGET,
   MAX_ACTIONS_PER_TURN,
+  HEARING_RADIUS,
   NORMAL_SPEED,
   SCAVENGE_RADIUS,
 } from '../config/constants';
@@ -63,7 +64,7 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
     // it survives a save and doesn't outlive the run in module state.
     if (!monster.broken && isBroken(monster)) {
       monster.broken = true;
-      if (isVisible(region.visibility, monster.x, monster.y)) {
+      if (canSpot(state, monster.x, monster.y)) {
         addMessage(state, `${actorLabel(monster)} breaks and runs.`.replace(/^./, (c) => c.toUpperCase()));
       }
     }
@@ -133,7 +134,7 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
       }
     } else {
       const tookItUp = resolveInvestigation(actor);
-      if (tookItUp && isVisible(region.visibility, actor.x, actor.y)) {
+      if (tookItUp && canSpot(state, actor.x, actor.y)) {
         addMessage(state, `${actorLabel(actor)} has seen enough.`.replace(/^./, (c) => c.toUpperCase()));
       }
       // They may now have someone to deal with; the next action will find them.
@@ -255,8 +256,10 @@ function attackTarget(
   // Being hit is a reason to hit back, and the victim's friends take note.
   reactToAttack(state, region, defender, attacker.faction);
 
-  const seen =
-    isVisible(region.visibility, attacker.x, attacker.y) || isVisible(region.visibility, defender.x, defender.y);
+  // You only get the blow-by-blow for a fight you can actually make out. Terrain visibility isn't
+  // the test: under daylight you can see a mile of road and still not tell who is hitting whom.
+  // Out of sight but within earshot, a fight is just a fight, somewhere over there.
+  const seen = canSpot(state, attacker.x, attacker.y) || canSpot(state, defender.x, defender.y);
   if (seen) {
     addMessage(
       state,
@@ -269,6 +272,8 @@ function attackTarget(
         seed: state.turnCount,
       }),
     );
+  } else if (chebyshevDistance(state.player, defender) <= HEARING_RADIUS) {
+    addMessage(state, narrateDistantFighting(state.player, defender));
   }
 
   if (defender.hp <= 0) {

@@ -53,6 +53,10 @@ const MAX_GROUPED_LINE = 160;
 export function addMessage(state: GameState, message: string): void {
   const last = state.messageLog[state.messageLog.length - 1];
 
+  // The same sentence twice in one turn is always noise — three raiders spotting you at once
+  // shouldn't produce the same shout three times, and they need not be consecutive to grate.
+  if (state.messageGroupOpen && last !== undefined && last.includes(message)) return;
+
   if (state.messageGroupOpen && last !== undefined && last.length + message.length + 1 <= MAX_GROUPED_LINE) {
     state.messageLog[state.messageLog.length - 1] = `${last} ${message}`;
   } else {
