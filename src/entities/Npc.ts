@@ -2,6 +2,7 @@ import type { Entity } from './Entity';
 import type { Combatant } from '../combat/Combatant';
 import { type FactionId } from '../world/Factions';
 import { NORMAL_SPEED, DEFAULT_WEIGHT } from '../config/constants';
+import { ITEMS } from '../items/ItemData';
 
 /**
  * A person: someone you can talk to, trade with — and, if you insist, fight.
@@ -29,10 +30,33 @@ export interface Npc extends Entity, Combatant {
   home?: { x: number; y: number };
   /** Factions this person has personally fallen out with. See Monster.provokedBy. */
   provokedBy: FactionId[];
+  /**
+   * Won't fight even when wronged: screams, runs, and leaves the answering to someone else.
+   * A Vigil almoner is not a soldier, and pretending otherwise makes every faction feel the same.
+   */
+  timid?: boolean;
+  /** Somewhere worth a look — a noise they heard. Cleared on arrival. */
+  investigating?: { x: number; y: number } | null;
+  /** Set once they've raised the alarm, so one incident doesn't produce a scream every turn. */
+  hasScreamed?: boolean;
   speed: number;
   energy: number;
   weight: number;
   awarenessRadius: number;
+}
+
+export interface NpcOptions {
+  /** Walking into them opens this shop instead of a conversation. */
+  shopId?: string;
+  faction?: FactionId;
+  /** What they fight with (an ItemData id). Unarmed if omitted. */
+  weapon?: string;
+  /** See Npc.timid. */
+  timid?: boolean;
+  /** How far they drift from home while going about their day. */
+  wanderRadius?: number;
+  hp?: number;
+  ac?: number;
 }
 
 export function createNpc(
@@ -43,9 +67,10 @@ export function createNpc(
   x: number,
   y: number,
   dialogue: string,
-  shopId?: string,
-  faction: FactionId = 'restoration',
+  options: NpcOptions = {},
 ): Npc {
+  const { shopId, faction = 'restoration', weapon, timid, wanderRadius, hp = 10, ac = 11 } = options;
+  const weaponDef = weapon ? ITEMS[weapon] : undefined;
   const npc: Npc = {
     id,
     kind: 'npc',
@@ -58,14 +83,15 @@ export function createNpc(
     faction,
     home: { x, y },
 
-    // A civilian: enough to be worth robbing, not enough to be a fight.
-    hp: 10,
-    maxHp: 10,
-    ac: 11,
+    // A civilian: enough to be worth robbing, not enough to be a fight. Someone carrying
+    // something fights with it, which is most of what separates a shopkeeper from a corporal.
+    hp,
+    maxHp: hp,
+    ac,
     strength: 4,
     agility: 5,
-    accuracyBonus: 0,
-    damage: [{ type: 'bludgeon', min: 1, max: 3 }],
+    accuracyBonus: weaponDef?.accuracyBonus ?? 0,
+    damage: weaponDef?.damage?.map((packet) => ({ ...packet })) ?? [{ type: 'bludgeon', min: 1, max: 3 }],
     resistances: {},
     tags: ['living', 'humanoid', 'head', 'arms', 'legs', 'sentient'],
 
@@ -76,5 +102,7 @@ export function createNpc(
     awarenessRadius: 7,
   };
   if (shopId) npc.shopId = shopId;
+  if (timid) npc.timid = true;
+  if (wanderRadius !== undefined) npc.wanderRadius = wanderRadius;
   return npc;
 }

@@ -68,3 +68,6 @@ export const DEFAULT_THROW_BONUS = -20;
 
 /** How much worse a boot is than a hand at aiming a loose object. */
 export const KICK_ACCURACY_PENALTY = 20;
+
+/** How far a scream carries. Further than sight, and walls don't stop it. */
+export const ALARM_RADIUS = 14;

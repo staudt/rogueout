@@ -2,10 +2,11 @@ import type { Monster } from '../entities/Monster';
 import type { Npc } from '../entities/Npc';
 import type { Player } from '../entities/Player';
 import type { GameState, RegionState } from '../engine/GameState';
+import { addMessage } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
-import { chebyshevDistance } from '../utils/geometry';
-import type { FactionId } from '../world/Factions';
-import { ALERT_RADIUS } from '../config/constants';
+import { chebyshevDistance, type Point } from '../utils/geometry';
+import { standingBetween, type FactionId } from '../world/Factions';
+import { ALERT_RADIUS, ALARM_RADIUS } from '../config/constants';
 
 /**
  * Everything that can be hit, hunted, or take a turn — the player, creatures, and people.
@@ -57,12 +58,13 @@ export function provoke(target: Provokable, faction: FactionId): boolean {
 }
 
 /**
- * Word gets around. When someone is attacked, their nearby faction-mates take it personally too.
+ * Word gets around. When someone is attacked, those who'd take their side take it personally too.
  *
- * This is what stops a settlement being a queue: hit one Restoration trooper in the street and
- * the rest don't stand about waiting their turn to notice. Scoped by distance rather than applied
- * faction-wide, so a grudge stays local to the people who could plausibly have seen it — attacking
- * a lone scout in the desert doesn't make you an enemy of everyone wearing the same colours.
+ * "Their side" is anyone their faction is *friendly* with, not merely their own colours — which
+ * is how the Reclamation ends up defending the Vigil without either of them being told to.
+ * Scoped by distance rather than applied faction-wide, so a grudge stays local to the people who
+ * could plausibly have seen it: attacking a lone scout in the desert doesn't make you an enemy of
+ * everyone wearing the same badge.
  */
 export function alertAllies(
   region: RegionState,
@@ -74,7 +76,8 @@ export function alertAllies(
 
   for (const ally of [...region.monsters, ...region.npcs]) {
     if (ally === victim || ally.hp <= 0) continue;
-    if (ally.faction !== victim.faction) continue;
+    if (ally.faction === offender) continue;
+    if (standingBetween(ally.faction, victim.faction) !== 'friendly') continue;
     if (chebyshevDistance(ally, victim) > radius) continue;
     if (provoke(ally, offender)) alerted++;
   }
@@ -82,8 +85,75 @@ export function alertAllies(
   return alerted;
 }
 
+/**
+ * A shout, and what everyone within earshot makes of it.
+ *
+ * Three reactions, which is what makes a settlement feel populated rather than scripted:
+ * - **Those on the screamer's side** know whose voice it was and whose fault it is, so they turn
+ *   on the offender without needing to have seen anything.
+ * - **Everyone else** doesn't know what happened — only that something did. They go and look,
+ *   and what they do when they arrive depends on what they find.
+ * - **The offender's own faction** hears it and doesn't care.
+ *
+ * Distance is the only gate. Walls don't stop sound, which is deliberate: hearing round a corner
+ * is the point of a scream.
+ */
+export function raiseAlarm(
+  region: RegionState,
+  at: Point,
+  screamerFaction: FactionId,
+  offender: FactionId,
+  radius: number = ALARM_RADIUS,
+): void {
+  for (const listener of [...region.monsters, ...region.npcs]) {
+    if (listener.hp <= 0) continue;
+    if (listener.faction === offender) continue;
+    if (chebyshevDistance(listener, at) > radius) continue;
+
+    if (standingBetween(listener.faction, screamerFaction) === 'friendly') {
+      provoke(listener, offender);
+      listener.investigating = { x: at.x, y: at.y };
+    } else if (!listener.investigating) {
+      // Curious, not committed. They'll form an opinion when they get there.
+      listener.investigating = { x: at.x, y: at.y };
+    }
+  }
+}
+
+/** Whether this actor is the sort to shout when something happens to it. */
+export function canRaiseAlarm(actor: Provokable): boolean {
+  return actor.tags.includes('sentient');
+}
+
 /** Removes a dead actor from whichever list it lives in. */
 export function removeActor(region: RegionState, actor: Actor): void {
   if (actor.kind === 'monster') region.monsters = region.monsters.filter((m) => m !== actor);
   else if (actor.kind === 'npc') region.npcs = region.npcs.filter((n) => n !== actor);
+}
+
+/**
+ * Everything that follows from the player starting on someone: they take it personally, anyone
+ * on their side does too, and — if they have a voice — they use it.
+ *
+ * One place, because it has to happen identically whether the player used a blade, a boot or a
+ * thrown bottle, and forgetting one of those is how a world stops feeling consistent.
+ */
+export function reactToAttack(
+  state: GameState,
+  region: RegionState,
+  victim: Provokable,
+  offender: FactionId,
+): void {
+  const firstTime = provoke(victim, offender);
+  if (!firstTime) return;
+
+  alertAllies(region, victim, offender);
+
+  if (!canRaiseAlarm(victim) || victim.hasScreamed) return;
+  victim.hasScreamed = true;
+  raiseAlarm(region, victim, victim.faction, offender);
+
+  if (chebyshevDistance(state.player, victim) <= ALARM_RADIUS) {
+    addMessage(state, `${actorLabel(victim)} shouts for help.`.replace(/^./, (c) => c.toUpperCase()));
+  }
 }

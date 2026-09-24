@@ -33,7 +33,8 @@ export type ActionKey =
   | 'g'
   | 'd'
   | 't'
-  | ';';
+  | ';'
+  | 'F';
 const ACTION_KEYS: ReadonlySet<string> = new Set<ActionKey>([
   ',',
   'w',
@@ -50,6 +51,7 @@ const ACTION_KEYS: ReadonlySet<string> = new Set<ActionKey>([
   'd', // drop
   't', // throw
   ';', // look: what is that?
+  'F', // fight: attack deliberately, even someone peaceful
 ]);
 
 function isActionKey(key: string): key is ActionKey {

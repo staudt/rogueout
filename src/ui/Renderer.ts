@@ -102,10 +102,15 @@ export class Renderer {
    * nothing. Which faction someone belongs to is already carried by their glyph colour, which is
    * enough: factions are mostly a human concern.
    */
-  private drawStandingMark(screen: Point, playerFaction: string, faction: string): void {
-    const standing = standingBetween(playerFaction, faction);
+  private drawStandingMark(screen: Point, playerFaction: string, actor: { faction: string; provokedBy: string[] }): void {
+    if (actor.faction === playerFaction) return; // you don't need ringing
+
+    // Provocation counts. Someone you just kicked is trying to kill you whatever the table says,
+    // and the ring is meant to answer "is this thing coming for me right now".
+    const standing = actor.provokedBy.includes(playerFaction)
+      ? 'hostile'
+      : standingBetween(playerFaction, actor.faction);
     if (standing === 'neutral') return;
-    if (faction === playerFaction) return; // you don't need ringing
 
     this.ctx.strokeStyle = standing === 'hostile' ? HOSTILE_MARK : ALLIED_MARK;
     this.ctx.lineWidth = MARK_WIDTH;
@@ -163,7 +168,7 @@ export class Renderer {
     for (const npc of region.npcs) {
       if (!canSpot(state, npc.x, npc.y)) continue;
       const screen = this.camera.worldToScreen(npc.x, npc.y);
-      this.drawStandingMark(screen, state.player.faction, npc.faction);
+      this.drawStandingMark(screen, state.player.faction, npc);
       ctx.fillStyle = npc.fg;
       ctx.fillText(npc.glyph, screen.x + 2, screen.y + 2);
     }
@@ -171,7 +176,7 @@ export class Renderer {
     for (const monster of region.monsters) {
       if (!canSpot(state, monster.x, monster.y)) continue;
       const screen = this.camera.worldToScreen(monster.x, monster.y);
-      this.drawStandingMark(screen, state.player.faction, monster.faction);
+      this.drawStandingMark(screen, state.player.faction, monster);
       ctx.fillStyle = monster.fg;
       ctx.fillText(monster.glyph, screen.x + 2, screen.y + 2);
     }

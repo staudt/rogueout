@@ -69,7 +69,7 @@ export function describeTile(state: GameState, x: number, y: number): Descriptio
         faction ? `Of ${faction.name}.` : '',
         faction?.creed ?? '',
         '',
-        standingLine(state.player.faction, npc.faction),
+        standingLine(state.player.faction, npc.faction, npc.provokedBy),
       ].filter((line) => line !== ''),
     };
   }
@@ -89,7 +89,7 @@ function describeMonster(state: GameState, monster: Monster): Description {
   const name = def?.name ?? 'something';
   const lines: string[] = [];
 
-  lines.push(standingLine(state.player.faction, monster.faction));
+  lines.push(standingLine(state.player.faction, monster.faction, monster.provokedBy));
 
   const faction = FACTIONS[monster.faction];
   if (faction && monster.faction !== 'wildlife' && monster.faction !== 'predators') {
@@ -110,7 +110,10 @@ function describeMonster(state: GameState, monster: Monster): Description {
   return { title: name, lines };
 }
 
-function standingLine(playerFaction: string, faction: string): string {
+function standingLine(playerFaction: string, faction: string, provokedBy: readonly string[] = []): string {
+  // A grudge outranks the table: someone you just kicked is an enemy whatever their faction says.
+  if (provokedBy.includes(playerFaction)) return 'It wants you dead — you started it.';
+
   switch (standingBetween(playerFaction, faction)) {
     case 'hostile':
       return 'It wants you dead.';

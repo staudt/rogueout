@@ -16,15 +16,7 @@ import {
   PLAYER_DEATH,
 } from '../narrative/Narration';
 import { areHostile } from '../world/Factions';
-import {
-  actorLabel,
-  alertAllies,
-  livingActors,
-  provoke,
-  removeActor,
-  type Actor,
-  type Provokable,
-} from './Actors';
+import { actorLabel, livingActors, reactToAttack, removeActor, type Actor, type Provokable } from './Actors';
 import { isVisible } from '../fov/VisibilityState';
 import { DETOUR_NODE_BUDGET, MAX_ACTIONS_PER_TURN, NORMAL_SPEED } from '../config/constants';
 import { findPath } from '../pathfinding/BFS';
@@ -89,23 +81,37 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
   }
 
   const target = behavior === 'chase' ? findTarget(actor, state, region) : null;
-  if (!target) {
-    wander(actor, state, region, rng);
+  if (target) {
+    // Whatever they came to look at, this is more pressing.
+    actor.investigating = null;
+    if (chebyshevDistance(actor, target) === 1) attackTarget(actor, target, state, region, rng);
+    else moveToward(actor, target, state, region);
     return;
   }
 
-  if (chebyshevDistance(actor, target) === 1) attackTarget(actor, target, state, region, rng);
-  else moveToward(actor, target, state, region);
+  // Nothing to fight, but something was heard. Go and see.
+  if (actor.investigating) {
+    if (chebyshevDistance(actor, actor.investigating) <= 1) {
+      actor.investigating = null;
+    } else {
+      moveToward(actor, actor.investigating, state, region);
+      return;
+    }
+  }
+
+  wander(actor, state, region, rng);
 }
 
 /**
  * What an actor will actually do this instant, which isn't always what its data says.
  *
- * Two overrides, in order: anything that's been hit stops grazing and fights back, and anything
- * with no stomach for it runs once badly hurt. Morale is per-creature data (`MonsterDef.cowardly`)
- * — the Wake break and run, Restoration troopers don't, and the feral don't know how.
+ * Overrides, in order: anything with no stomach for a fight runs the moment it has one, anything
+ * that's been hit fights back, and anything whose nerve has gone runs. Morale is per-creature
+ * data (`MonsterDef.cowardly`) — the Wake break and run, Restoration troopers don't, and the
+ * feral don't know how.
  */
 function effectiveBehavior(actor: Provokable): 'wander' | 'chase' | 'flee' {
+  if (actor.kind === 'npc' && actor.timid) return actor.provokedBy.length > 0 ? 'flee' : 'wander';
   if (isBroken(actor)) return 'flee';
   if (actor.provokedBy.length > 0) return 'chase';
   return actor.kind === 'monster' ? actor.behavior : 'wander';
@@ -190,7 +196,7 @@ function attackTarget(
   const result = resolveMeleeAttack(rng, attacker, defender);
 
   // Being hit is a reason to hit back, and the victim's friends take note.
-  if (provoke(defender, attacker.faction)) alertAllies(region, defender, attacker.faction);
+  reactToAttack(state, region, defender, attacker.faction);
 
   const seen =
     isVisible(region.visibility, attacker.x, attacker.y) || isVisible(region.visibility, defender.x, defender.y);
@@ -306,7 +312,7 @@ export function runNpcTurns(state: GameState, rng: RNG): void {
 
     // Someone with a quarrel stops sweeping the step and deals with it, using the same AI as
     // anything else — that's the point of NPCs being actors.
-    if (npc.provokedBy.length > 0) {
+    if (npc.provokedBy.length > 0 || npc.investigating) {
       npc.energy += npc.speed;
       let actions = 0;
       while (npc.energy >= NORMAL_SPEED && actions < MAX_ACTIONS_PER_TURN) {

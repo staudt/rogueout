@@ -24,6 +24,10 @@ export interface Monster extends Entity, Combatant {
   weight: number;
   /** Set once its nerve goes, so "it breaks and runs" is said when it happens and not after. */
   broken?: boolean;
+  /** Somewhere worth a look — a noise it heard. Cleared on arrival. */
+  investigating?: { x: number; y: number } | null;
+  /** Set once it's raised the alarm, so one incident doesn't produce a shout every turn. */
+  hasScreamed?: boolean;
 }
 
 let nextInstanceId = 0;

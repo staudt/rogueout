@@ -58,6 +58,7 @@ type ItemAction = 'use' | 'wield' | 'wear' | 'throw' | 'drop';
 type CommandAction =
   | 'pickup'
   | 'kick'
+  | 'fight'
   | 'go'
   | 'throw'
   | 'drop'
@@ -470,6 +471,9 @@ export class Game {
       case ';':
         this.startLook();
         break;
+      case 'F':
+        this.promptDirection('Attack in which direction?', (direction) => this.fight(direction));
+        break;
     }
   }
 
@@ -543,6 +547,32 @@ export class Game {
       }
       action(direction);
     });
+  }
+
+  /**
+   * `F`: attack whatever is there on purpose, including someone peaceful.
+   *
+   * Walking into a peaceful person talks to them or opens their shop, which is right almost
+   * always — and leaves no way at all to start something. This is that way, and it being a
+   * separate deliberate key is the point: you do not rob a shopkeeper by mistyping a direction.
+   */
+  private fight(direction: Direction): void {
+    const region = getActiveRegion(this.state);
+    const vector = DIRECTION_VECTORS[direction];
+    const target = { x: this.state.player.x + vector.x, y: this.state.player.y + vector.y };
+
+    const victim = [...region.monsters, ...region.npcs].find(
+      (a) => a.hp > 0 && a.x === target.x && a.y === target.y,
+    );
+    if (!victim) {
+      addMessage(this.state, 'There is nothing there to attack.');
+      this.render();
+      return;
+    }
+
+    this.turnManager.attackActor(victim);
+    this.turnManager.advanceTurn();
+    this.render();
   }
 
   /** `k`: boot whatever is in that direction — a creature, a loose object, or a wall. */
@@ -694,6 +724,7 @@ export class Game {
       { label: 'Throw', value: 'throw', hint: '[t]' },
       { label: 'Drop', value: 'drop', hint: '[d]' },
       { label: 'Kick', value: 'kick', hint: '[k]' },
+      { label: 'Attack deliberately', value: 'fight', hint: '[F]' },
       { label: 'Go until something happens', value: 'go', hint: '[g]' },
       { label: 'Fire', value: 'fire', hint: '[f]' },
       { label: 'Wait a turn', value: 'wait', hint: '[.]' },
@@ -767,6 +798,10 @@ export class Game {
       case 'go':
         this.screens.closeAll();
         this.promptDirection('Go in which direction?', (direction) => this.travelInDirection(direction));
+        break;
+      case 'fight':
+        this.screens.closeAll();
+        this.promptDirection('Attack in which direction?', (direction) => this.fight(direction));
         break;
       case 'look':
         this.screens.closeAll();

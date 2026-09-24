@@ -44,12 +44,6 @@ export interface RegionDef {
   transitions: RegionTransition[];
 }
 
-/** Marks an NPC as one who drifts around their patch rather than standing at a post. */
-function wanderer(npc: Npc, radius: number): Npc {
-  npc.wanderRadius = radius;
-  return npc;
-}
-
 function makeRegionState(
   map: GameMapData,
   monsters: Monster[] = [],
@@ -86,36 +80,28 @@ export const REGIONS: Record<string, RegionDef> = {
             OVERWORLD_SHOPKEEPER_POS.x,
             OVERWORLD_SHOPKEEPER_POS.y,
             'Reclamation post. If it was made before, I will buy it.',
-            'reclamationPost',
-            'reclamation',
+            { shopId: 'reclamationPost', faction: 'reclamation', weapon: 'pipeWrench', hp: 14 },
           ),
-          wanderer(
-            createNpc(
-              'almoner',
-              'Sister Adel of the Vigil',
-              '@',
-              '#9fd3e0',
-              8,
-              12,
-              'There is water at the cistern, and no charge for it. Sit a while if you need to.',
-              undefined,
-              'vigil',
-            ),
-            4,
+          createNpc(
+            'almoner',
+            'Sister Adel of the Vigil',
+            '@',
+            '#9fd3e0',
+            8,
+            12,
+            'There is water at the cistern, and no charge for it. Sit a while if you need to.',
+            // No weapon and no stomach for it: she screams and runs, and lets others answer.
+            { faction: 'vigil', timid: true, wanderRadius: 4, hp: 8 },
           ),
-          wanderer(
-            createNpc(
-              'trooper',
-              'Corporal Vance',
-              '@',
-              '#c8b88a',
-              15,
-              17,
-              'Restoration holds this stretch of road. Keep your weapon down and we will have no trouble.',
-              undefined,
-              'restoration',
-            ),
-            5,
+          createNpc(
+            'trooper',
+            'Corporal Vance',
+            '@',
+            '#c8b88a',
+            15,
+            17,
+            'Restoration holds this stretch of road. Keep your weapon down and we will have no trouble.',
+            { faction: 'restoration', weapon: 'machete', wanderRadius: 5, hp: 16, ac: 13 },
           ),
         ],
         true, // open sky

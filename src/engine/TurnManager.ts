@@ -18,7 +18,7 @@ import { ITEMS } from '../items/ItemData';
 import { runMonsterTurns, runNpcTurns } from '../ai/AIScheduler';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import { areHostile } from '../world/Factions';
-import { actorLabel, alertAllies, provoke, removeActor, type Provokable } from '../ai/Actors';
+import { actorLabel, reactToAttack, removeActor, type Provokable } from '../ai/Actors';
 import type { RNG } from '../utils/RNG';
 import { withArticle } from '../utils/text';
 import {
@@ -206,23 +206,19 @@ export class TurnManager {
   }
 
   /**
-   * The player swinging at anything — a creature or a person. Whoever it is takes it personally,
+   * The player swinging at anything — a creature or a person. Public because `F` (fight) needs it
+   * for targets that bumping would otherwise talk to. Whoever it is takes it personally,
    * and so do their nearby faction-mates: hitting one trooper in the street shouldn't leave the
    * rest waiting politely for their turn to notice.
    */
-  private attackActor(defender: Provokable): void {
+  attackActor(defender: Provokable): void {
     const region = getActiveRegion(this.state);
     const result = resolveMeleeAttack(this.rng, this.state.player, defender);
     const weapon = this.state.player.equipment.weapon;
     const weaponDef = weapon ? ITEMS[weapon.defId] : undefined;
     const label = actorLabel(defender);
 
-    if (provoke(defender, this.state.player.faction)) {
-      const alerted = alertAllies(region, defender, this.state.player.faction);
-      if (alerted > 0 && defender.kind === 'npc') {
-        addMessage(this.state, 'Someone shouts. Heads turn.');
-      }
-    }
+    reactToAttack(this.state, region, defender, this.state.player.faction);
 
     // Nothing here knows what a head is: the weapon claims it can take one, the creature says
     // whether it has one, and the rule is just the two tags meeting.

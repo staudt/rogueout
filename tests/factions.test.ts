@@ -208,7 +208,7 @@ describe('townsfolk', () => {
   it('drift around their patch but never leave it', () => {
     const region = openArena(30, 15);
     region.npcs.push({
-      ...createNpc('walker', 'Walker', '@', '#fff', 10, 7, 'hm', undefined, 'vigil'),
+      ...createNpc('walker', 'Walker', '@', '#fff', 10, 7, 'hm', { faction: 'vigil' }),
       wanderRadius: 3,
     });
     const state = arenaState(region, 28, 13);
@@ -227,7 +227,7 @@ describe('townsfolk', () => {
 
   it('a shopkeeper stays at the counter', () => {
     const region = openArena();
-    region.npcs.push(createNpc('keeper', 'Keeper', '@', '#fff', 6, 4, 'hm', 'reclamationPost', 'reclamation'));
+    region.npcs.push(createNpc('keeper', 'Keeper', '@', '#fff', 6, 4, 'hm', { shopId: 'reclamationPost', faction: 'reclamation' }));
     const state = arenaState(region, 2, 2);
 
     for (let turn = 0; turn < 20; turn++) runNpcTurns(state, createRNG(turn + 1));
@@ -315,7 +315,7 @@ describe('word gets around', () => {
   it('reaches people as well as creatures', () => {
     const region = openArena(20, 12);
     const trooper = createMonster(MONSTERS['restorationTrooper']!, 8, 5);
-    const bystander = createNpc('b', 'Bystander', '@', '#fff', 9, 5, 'hm', undefined, 'restoration');
+    const bystander = createNpc('b', 'Bystander', '@', '#fff', 9, 5, 'hm', { faction: 'restoration' });
     region.monsters.push(trooper);
     region.npcs.push(bystander);
 
@@ -329,7 +329,7 @@ describe('word gets around', () => {
 describe('townsfolk are people, not scenery', () => {
   it('can be attacked, and fight back once they have been', () => {
     const region = openArena();
-    const civilian = createNpc('c', 'Civilian', '@', '#fff', 3, 4, 'hm', undefined, 'restoration');
+    const civilian = createNpc('c', 'Civilian', '@', '#fff', 3, 4, 'hm', { faction: 'restoration' });
     region.npcs.push(civilian);
     const state = arenaState(region, 2, 4);
     civilian.provokedBy.push('player');
@@ -349,7 +349,7 @@ describe('townsfolk are people, not scenery', () => {
     // The Wake is hostile to the Restoration; a raider should go for a settler unprompted.
     const region = openArena(24, 9);
     const raider = createMonster(MONSTERS['wakeRaider']!, 5, 4);
-    const settler = createNpc('s', 'Settler', '@', '#fff', 9, 4, 'hm', undefined, 'restoration');
+    const settler = createNpc('s', 'Settler', '@', '#fff', 9, 4, 'hm', { faction: 'restoration' });
     region.monsters.push(raider);
     region.npcs.push(settler);
     const state = arenaState(region, 22, 8); // player far away and uninvolved

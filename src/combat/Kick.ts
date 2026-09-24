@@ -2,7 +2,7 @@ import { addMessage, type GameState, type RegionState } from '../engine/GameStat
 import { KNOCKBACK_BY_WEIGHT } from '../config/constants';
 import { DIRECTION_VECTORS, type Direction, type Point } from '../utils/geometry';
 import { isWalkable } from '../world/GameMap';
-import { actorLabel, alertAllies, provoke, removeActor, type Actor, type Provokable } from '../ai/Actors';
+import { actorLabel, reactToAttack, removeActor, type Actor, type Provokable } from '../ai/Actors';
 import { rollTypedDamage, type DamagePacket } from './DamageTypes';
 import { computeToHitChance } from './CombatFormulas';
 import { randomInt } from '../utils/RNG';
@@ -87,7 +87,7 @@ export function kickCreature(
 
   // Being kicked counts as a quarrel, exactly like being hit does — and the victim's friends
   // notice, which is the difference between kicking someone and kicking someone in public.
-  if (provoke(monster, state.player.faction)) alertAllies(region, monster, state.player.faction);
+  reactToAttack(state, region, monster, state.player.faction);
 
   addMessage(state, damage.shrugged ? `You kick ${label}, to no effect.` : `You kick ${label}.`);
 
@@ -180,7 +180,7 @@ export function flingItem(
         rolled.shrugged ? `It bounces off ${label}.` : `It hits ${label}.`,
       );
 
-      if (provoke(occupant, state.player.faction)) alertAllies(region, occupant, state.player.faction);
+      reactToAttack(state, region, occupant, state.player.faction);
 
       if (occupant.hp <= 0) {
         addMessage(state, capitalized(`${label} goes down.`));

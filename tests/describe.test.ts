@@ -83,7 +83,7 @@ describe('describing a creature', () => {
 describe('describing people, things and ground', () => {
   it('gives an NPC their faction and what it stands for', () => {
     const r = region();
-    r.npcs.push(createNpc('a', 'Sister Adel', '@', '#fff', 4, 2, 'hello', undefined, 'vigil'));
+    r.npcs.push(createNpc('a', 'Sister Adel', '@', '#fff', 4, 2, 'hello', { faction: 'vigil' }));
     see(r, 4, 2);
 
     const description = describeTile(state(r), 4, 2);

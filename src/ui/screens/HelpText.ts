@@ -20,6 +20,7 @@ export const HELP_LINES: readonly string[] = [
   '  t                 throw something',
   '  d                 drop something',
   '  k                 kick (knocks light things back; blunt, whatever you hold)',
+  '  F                 attack on purpose, even someone peaceful',
   '  f                 fire (no ranged weapons yet)',
   '  > / <             descend / climb a staircase',
   '',

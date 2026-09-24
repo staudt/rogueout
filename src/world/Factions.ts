@@ -95,6 +95,9 @@ const STANDINGS: ReadonlyArray<readonly [FactionId, FactionId, Standing]> = [
 
   // The one faction that is glad to see anybody.
   ['vigil', 'player', 'friendly'],
+  // The Reclamation will not watch the Vigil get hurt: the almoners keep their people alive, and
+  // everyone knows it. This is also what makes a scream in the street bring more than one answer.
+  ['reclamation', 'vigil', 'friendly'],
 ];
 
 const lookup = new Map<string, Standing>();
