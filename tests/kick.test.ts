@@ -158,7 +158,8 @@ describe('flinging an object', () => {
     const state = stateFor(region);
     const before = rat.hp;
 
-    const result = flingItem('machete', { x: 2, y: 4 }, 'E', 6, ITEMS['machete']!.damage, state, region, createRNG(2));
+    // A generous throw bonus so this test is about damage, not about aim.
+    const result = flingItem('machete', { x: 2, y: 4 }, 'E', 6, ITEMS['machete']!.damage, state, region, createRNG(2), 200);
 
     expect(result.struck).toBe(rat);
     expect(rat.hp).toBeLessThan(before);
@@ -171,7 +172,7 @@ describe('flinging an object', () => {
     region.monsters.push(mold);
     const state = stateFor(region);
 
-    flingItem('scrapSpear', { x: 2, y: 4 }, 'E', 6, ITEMS['scrapSpear']!.damage, state, region, createRNG(1));
+    flingItem('scrapSpear', { x: 2, y: 4 }, 'E', 6, ITEMS['scrapSpear']!.damage, state, region, createRNG(1), 200);
 
     expect(mold.hp).toBe(mold.maxHp);
     expect(state.messageLog.join(' ')).toMatch(/bounces off/);
@@ -184,5 +185,47 @@ describe('flinging an object', () => {
     const result = flingItem('machete', { x: 15, y: 4 }, 'E', 6, undefined, state, region, createRNG(1));
 
     expect(result.landedAt).toEqual({ x: 18, y: 4 }); // last open tile before the wall
+  });
+});
+
+
+describe('some things are made for throwing and some are not', () => {
+  /** Throws the same object at the same target many times and counts the hits. */
+  function hitRate(throwBonus: number): number {
+    let hits = 0;
+    const attempts = 200;
+    for (let seed = 0; seed < attempts; seed++) {
+      const region = arena();
+      const rat = createMonster(MONSTERS['dustRat']!, 5, 4);
+      region.monsters.push(rat);
+      const result = flingItem('x', { x: 2, y: 4 }, 'E', 6, undefined, stateFor(region), region, createRNG(seed), throwBonus);
+      if (result.struck) hits++;
+    }
+    return hits / attempts;
+  }
+
+  it('a knife lands far more often than a machete', () => {
+    const knife = hitRate(ITEMS['throwingKnife']!.throwBonus!);
+    const machete = hitRate(ITEMS['machete']!.throwBonus!);
+
+    expect(knife).toBeGreaterThan(machete + 0.2);
+  });
+
+  it('darts are the best thing you can throw', () => {
+    expect(ITEMS['dart']!.throwBonus!).toBeGreaterThan(ITEMS['scrapSpear']!.throwBonus!);
+    expect(ITEMS['scrapSpear']!.throwBonus!).toBeGreaterThan(ITEMS['machete']!.throwBonus!);
+  });
+
+  it('a missed throw sails past and keeps going, rather than stopping in mid-air', () => {
+    const region = arena();
+    region.monsters.push(createMonster(MONSTERS['dustRat']!, 4, 4));
+    const state = stateFor(region);
+
+    // Hopeless aim: it cannot connect, so it must travel the full range.
+    const result = flingItem('x', { x: 2, y: 4 }, 'E', 5, undefined, state, region, createRNG(1), -500);
+
+    expect(result.struck).toBeNull();
+    expect(result.landedAt.x).toBe(7);
+    expect(state.messageLog.join(' ')).toMatch(/sails past/);
   });
 });

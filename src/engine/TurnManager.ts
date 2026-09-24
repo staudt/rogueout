@@ -12,12 +12,13 @@ import { resolveMeleeAttack } from '../combat/CombatResolver';
 import { dropLoot } from '../combat/Death';
 import { hasTag } from '../combat/DamageTypes';
 import type { Monster } from '../entities/Monster';
-import { MONSTERS } from '../entities/MonsterData';
 import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedWeapon } from '../items/Equipment';
 import { ITEMS } from '../items/ItemData';
 import { runMonsterTurns, runNpcTurns } from '../ai/AIScheduler';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
+import { areHostile } from '../world/Factions';
+import { actorLabel, alertAllies, provoke, removeActor, type Provokable } from '../ai/Actors';
 import type { RNG } from '../utils/RNG';
 import { withArticle } from '../utils/text';
 import {
@@ -56,8 +57,14 @@ export class TurnManager {
     const vector = DIRECTION_VECTORS[direction];
     const target = addPoints(this.state.player, vector);
 
-    const targetNpc = region.npcs.find((n) => n.x === target.x && n.y === target.y);
+    const targetNpc = region.npcs.find((n) => n.hp > 0 && n.x === target.x && n.y === target.y);
     if (targetNpc) {
+      // Someone you've already fallen out with doesn't want to chat.
+      if (targetNpc.provokedBy.includes(this.state.player.faction) || areHostile(this.state.player.faction, targetNpc.faction)) {
+        this.attackActor(targetNpc);
+        this.advanceTurn();
+        return true;
+      }
       this.events.emit('npc-interacted', { npc: targetNpc });
       return false; // talking doesn't consume a turn, same as bumping a wall
     }
@@ -195,35 +202,42 @@ export class TurnManager {
   }
 
   private attackMonster(monster: Monster): void {
+    this.attackActor(monster);
+  }
+
+  /**
+   * The player swinging at anything — a creature or a person. Whoever it is takes it personally,
+   * and so do their nearby faction-mates: hitting one trooper in the street shouldn't leave the
+   * rest waiting politely for their turn to notice.
+   */
+  private attackActor(defender: Provokable): void {
     const region = getActiveRegion(this.state);
-    const result = resolveMeleeAttack(this.rng, this.state.player, monster);
-
-    // Whatever it was doing before, it has a quarrel with you now.
-    if (!monster.provokedBy.includes(this.state.player.faction)) {
-      monster.provokedBy.push(this.state.player.faction);
-    }
-    const def = MONSTERS[monster.defId];
+    const result = resolveMeleeAttack(this.rng, this.state.player, defender);
     const weapon = this.state.player.equipment.weapon;
-
-    // The kill is folded into the blow that caused it, rather than following as a second line —
-    // one action should read as one sentence.
     const weaponDef = weapon ? ITEMS[weapon.defId] : undefined;
+    const label = actorLabel(defender);
+
+    if (provoke(defender, this.state.player.faction)) {
+      const alerted = alertAllies(region, defender, this.state.player.faction);
+      if (alerted > 0 && defender.kind === 'npc') {
+        addMessage(this.state, 'Someone shouts. Heads turn.');
+      }
+    }
+
     // Nothing here knows what a head is: the weapon claims it can take one, the creature says
     // whether it has one, and the rule is just the two tags meeting.
     const decapitated =
-      result.type === 'cut' &&
-      hasTag(weaponDef?.traits, 'decapitates') &&
-      hasTag(monster.tags, 'head');
+      result.type === 'cut' && hasTag(weaponDef?.traits, 'decapitates') && hasTag(defender.tags, 'head');
 
     addMessage(
       this.state,
       narratePlayerAttack({
-        target: def?.name ?? 'creature',
+        target: label,
         verb: weaponDef?.attackVerb ?? UNARMED_VERB,
         hit: result.hit,
         damage: result.damage,
-        targetMaxHp: monster.maxHp,
-        killed: monster.hp <= 0,
+        targetMaxHp: defender.maxHp,
+        killed: defender.hp <= 0,
         shrugged: result.shrugged,
         decapitated,
         seed: this.state.turnCount,
@@ -231,14 +245,11 @@ export class TurnManager {
     );
 
     if (result.resisted) {
-      addMessage(
-        this.state,
-        narrateResisted(def?.name ?? 'creature', weaponDef?.attackVerb ?? UNARMED_VERB, this.state.turnCount),
-      );
+      addMessage(this.state, narrateResisted(label, weaponDef?.attackVerb ?? UNARMED_VERB, this.state.turnCount));
     }
 
     if (result.hit && !result.shrugged) {
-      const condition = narrateCondition(monster.hp, monster.maxHp);
+      const condition = narrateCondition(defender.hp, defender.maxHp);
       if (condition) addMessage(this.state, condition);
 
       const damaged = damageEquippedWeapon(this.state.player.equipment, this.state.player.inventory);
@@ -248,9 +259,9 @@ export class TurnManager {
       }
     }
 
-    if (monster.hp <= 0) {
-      dropLoot(monster, region, this.rng);
-      region.monsters = region.monsters.filter((m) => m !== monster);
+    if (defender.hp <= 0) {
+      if (defender.kind === 'monster') dropLoot(defender, region, this.rng);
+      removeActor(region, defender);
     }
   }
 }

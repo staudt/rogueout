@@ -22,6 +22,8 @@ export interface Monster extends Entity, Combatant {
   provokedBy: FactionId[];
   /** Roughly kilograms; read by knockback. */
   weight: number;
+  /** Set once its nerve goes, so "it breaks and runs" is said when it happens and not after. */
+  broken?: boolean;
 }
 
 let nextInstanceId = 0;

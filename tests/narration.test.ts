@@ -12,7 +12,7 @@ import {
 
 const attack = (over: Partial<Parameters<typeof narratePlayerAttack>[0]> = {}) =>
   narratePlayerAttack({
-    target: 'giant rat',
+    target: 'the giant rat', // callers pass a label, article included — see Actors.actorLabel
     verb: 'slash',
     hit: true,
     damage: 3,
@@ -89,10 +89,11 @@ describe('narrating the player attacking', () => {
 
 describe('narrating a monster attacking', () => {
   const bite = (over = {}) =>
-    narrateMonsterAttack({ attacker: 'goblin', hit: true, damage: 4, targetMaxHp: 25, seed: 0, ...over });
+    narrateMonsterAttack({ attacker: 'the goblin', hit: true, damage: 4, targetMaxHp: 25, seed: 0, ...over });
 
   it('names the attacker and keeps numbers out of it', () => {
     expect(bite()).toContain('goblin');
+    expect(bite()).toMatch(/^[A-Z]/); // a label may be lowercase; the sentence still isn't
     expect(bite()).not.toMatch(/\d/);
   });
 
@@ -159,5 +160,33 @@ describe('phrase variety', () => {
 
   it('returns an empty string rather than undefined for an empty table', () => {
     expect(pickPhrase([], 1)).toBe('');
+  });
+});
+
+
+describe('labels carry their own article', () => {
+  it('a proper name is never given a "the"', () => {
+    // People are people; creatures are a kind. Actors.actorLabel decides, not the template.
+    const line = narratePlayerAttack({
+      target: 'Corporal Vance',
+      verb: 'cut',
+      hit: true,
+      damage: 3,
+      targetMaxHp: 10,
+      killed: false,
+      seed: 1,
+    });
+
+    expect(line).toContain('Corporal Vance');
+    expect(line).not.toMatch(/the Corporal/i);
+  });
+
+  it('capitalises every sentence, including ones that open with a lowercase label', () => {
+    const lines = [0, 1, 2, 3, 4, 5].map((seed) =>
+      narrateMonsterAttack({ attacker: 'the goblin', hit: false, damage: 0, targetMaxHp: 25, seed }),
+    );
+
+    for (const line of lines) expect(line).toMatch(/^[A-Z]/);
+    expect(lines.some((line) => line.startsWith('The goblin'))).toBe(true);
   });
 });

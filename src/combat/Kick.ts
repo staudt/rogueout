@@ -2,9 +2,11 @@ import { addMessage, type GameState, type RegionState } from '../engine/GameStat
 import { KNOCKBACK_BY_WEIGHT } from '../config/constants';
 import { DIRECTION_VECTORS, type Direction, type Point } from '../utils/geometry';
 import { isWalkable } from '../world/GameMap';
-import type { Monster } from '../entities/Monster';
-import { MONSTERS } from '../entities/MonsterData';
+import { actorLabel, alertAllies, provoke, removeActor, type Actor, type Provokable } from '../ai/Actors';
 import { rollTypedDamage, type DamagePacket } from './DamageTypes';
+import { computeToHitChance } from './CombatFormulas';
+import { randomInt } from '../utils/RNG';
+import { DEFAULT_THROW_BONUS } from '../config/constants';
 import { dropLoot } from './Death';
 import type { RNG } from '../utils/RNG';
 
@@ -30,7 +32,7 @@ export interface KnockbackResult {
   /** How far it actually travelled, which may be less than intended. */
   moved: number;
   /** What it slammed into, if anything. */
-  collidedWith: Monster | null;
+  collidedWith: Provokable | null;
   /** It hit a wall rather than a creature. */
   hitWall: boolean;
 }
@@ -40,7 +42,7 @@ export interface KnockbackResult {
  * it slams into stops it — and takes the impact, which is how a kicked body becomes a weapon.
  */
 export function applyKnockback(
-  monster: Monster,
+  monster: Provokable,
   direction: Direction,
   tiles: number,
   state: GameState,
@@ -55,7 +57,7 @@ export function applyKnockback(
     if (!isWalkable(region.map, next.x, next.y)) return { moved, collidedWith: null, hitWall: true };
     if (next.x === state.player.x && next.y === state.player.y) return { moved, collidedWith: null, hitWall: true };
 
-    const occupant = region.monsters.find((m) => m.hp > 0 && m !== monster && m.x === next.x && m.y === next.y);
+    const occupant = occupantAt(region, next, monster);
     if (occupant) return { moved, collidedWith: occupant, hitWall: false };
 
     monster.x = next.x;
@@ -73,50 +75,51 @@ export interface KickOutcome {
 
 /** Kicks a creature: a little blunt damage, then send it flying if it's light enough. */
 export function kickCreature(
-  monster: Monster,
+  monster: Provokable,
   direction: Direction,
   state: GameState,
   region: RegionState,
   rng: RNG,
 ): KickOutcome {
-  const name = MONSTERS[monster.defId]?.name ?? 'creature';
+  const label = actorLabel(monster);
   const damage = rollTypedDamage(rng, KICK_DAMAGE, state.player.strength, monster.resistances);
   monster.hp = Math.max(0, monster.hp - damage.total);
 
-  // Being kicked counts as a quarrel, exactly like being hit does.
-  if (!monster.provokedBy.includes(state.player.faction)) monster.provokedBy.push(state.player.faction);
+  // Being kicked counts as a quarrel, exactly like being hit does — and the victim's friends
+  // notice, which is the difference between kicking someone and kicking someone in public.
+  if (provoke(monster, state.player.faction)) alertAllies(region, monster, state.player.faction);
 
-  addMessage(state, damage.shrugged ? `You kick the ${name}. It barely notices.` : `You kick the ${name}.`);
+  addMessage(state, damage.shrugged ? `You kick ${label}, to no effect.` : `You kick ${label}.`);
 
   if (monster.hp <= 0) {
-    addMessage(state, `The ${name} goes down.`);
-    dropLoot(monster, region, rng);
-    region.monsters = region.monsters.filter((m) => m !== monster);
+    addMessage(state, capitalized(`${label} goes down.`));
+    if (monster.kind === 'monster') dropLoot(monster, region, rng);
+    removeActor(region, monster);
     return { tookTurn: true };
   }
 
   const tiles = knockbackTiles(monster.weight);
   if (tiles === 0) {
-    addMessage(state, `The ${name} does not budge.`);
+    addMessage(state, capitalized(`${label} does not budge.`));
     return { tookTurn: true };
   }
 
   const knock = applyKnockback(monster, direction, tiles, state, region);
 
   if (knock.collidedWith) {
-    const otherName = MONSTERS[knock.collidedWith.defId]?.name ?? 'creature';
+    const otherLabel = actorLabel(knock.collidedWith);
     const impact = rollTypedDamage(rng, KICK_DAMAGE, 0, knock.collidedWith.resistances);
     knock.collidedWith.hp = Math.max(0, knock.collidedWith.hp - impact.total);
-    addMessage(state, `It slams into the ${otherName}.`);
+    addMessage(state, capitalized(`${label} slams into ${otherLabel}.`));
     if (knock.collidedWith.hp <= 0) {
-      addMessage(state, `The ${otherName} goes down.`);
-      dropLoot(knock.collidedWith, region, rng);
-      region.monsters = region.monsters.filter((m) => m !== knock.collidedWith);
+      addMessage(state, capitalized(`${otherLabel} goes down.`));
+      if (knock.collidedWith.kind === 'monster') dropLoot(knock.collidedWith, region, rng);
+      removeActor(region, knock.collidedWith);
     }
   } else if (knock.hitWall && knock.moved === 0) {
-    addMessage(state, `The ${name} is pinned against the wall.`);
+    addMessage(state, capitalized(`${label} is pinned against the wall.`));
   } else if (knock.moved > 0) {
-    addMessage(state, `It is knocked back.`);
+    addMessage(state, capitalized(`${label} is knocked back.`));
   }
 
   return { tookTurn: true };
@@ -129,7 +132,7 @@ export interface FlingResult {
   /** Where the object came to rest. */
   landedAt: Point;
   /** Who it hit on the way, if anyone. */
-  struck: Monster | null;
+  struck: Provokable | null;
 }
 
 /**
@@ -149,6 +152,7 @@ export function flingItem(
   state: GameState,
   region: RegionState,
   rng: RNG,
+  throwBonus: number = DEFAULT_THROW_BONUS,
 ): FlingResult {
   const vector = DIRECTION_VECTORS[direction];
   let landedAt: Point = { x: from.x, y: from.y };
@@ -157,23 +161,31 @@ export function flingItem(
     const next: Point = { x: landedAt.x + vector.x, y: landedAt.y + vector.y };
     if (!isWalkable(region.map, next.x, next.y)) break;
 
-    const occupant = region.monsters.find((m) => m.hp > 0 && m.x === next.x && m.y === next.y);
+    const occupant = occupantAt(region, next, null);
     if (occupant) {
+      // Whether it lands depends on what you threw. A knife flies; a machete tumbles past.
+      const chance = computeToHitChance(state.player.agility, throwBonus, occupant.ac);
+      if (randomInt(rng, 1, 100) > chance) {
+        addMessage(state, `It sails past ${actorLabel(occupant)}.`);
+        landedAt = next;
+        continue;
+      }
+
       const rolled = rollTypedDamage(rng, damage ?? IMPROVISED_DAMAGE, 0, occupant.resistances);
       occupant.hp = Math.max(0, occupant.hp - rolled.total);
 
-      const name = MONSTERS[occupant.defId]?.name ?? 'creature';
+      const label = actorLabel(occupant);
       addMessage(
         state,
-        rolled.shrugged ? `It bounces off the ${name}.` : `It hits the ${name}.`,
+        rolled.shrugged ? `It bounces off ${label}.` : `It hits ${label}.`,
       );
 
-      if (!occupant.provokedBy.includes(state.player.faction)) occupant.provokedBy.push(state.player.faction);
+      if (provoke(occupant, state.player.faction)) alertAllies(region, occupant, state.player.faction);
 
       if (occupant.hp <= 0) {
-        addMessage(state, `The ${name} goes down.`);
-        dropLoot(occupant, region, rng);
-        region.monsters = region.monsters.filter((m) => m !== occupant);
+        addMessage(state, capitalized(`${label} goes down.`));
+        if (occupant.kind === 'monster') dropLoot(occupant, region, rng);
+        removeActor(region, occupant);
       }
 
       return { landedAt: next, struck: occupant };
@@ -184,4 +196,17 @@ export function flingItem(
 
   void defId;
   return { landedAt, struck: null };
+}
+
+/** Anyone standing on that tile — creature or person — other than the one being shoved. */
+function occupantAt(region: RegionState, at: Point, exclude: Actor | null): Provokable | null {
+  const here = [...region.monsters, ...region.npcs].find(
+    (a) => a.hp > 0 && a !== exclude && a.x === at.x && a.y === at.y,
+  );
+  return here ?? null;
+}
+
+/** A label may start with a proper name or with "the"; either way the sentence starts capitalised. */
+function capitalized(line: string): string {
+  return line.charAt(0).toUpperCase() + line.slice(1);
 }

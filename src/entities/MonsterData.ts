@@ -36,6 +36,12 @@ export interface MonsterDef {
   /** What it leaves behind. Humans carry their gear; animals don't.  */
   drops?: MonsterDrop[];
   /**
+   * Whether it breaks and runs once badly hurt. Morale, as data: the Wake are in it for
+   * themselves and will not die for it; Restoration troopers are disciplined; the feral don't
+   * have the wit to be afraid.
+   */
+  cowardly?: boolean;
+  /**
    * Roughly kilograms. Only knockback reads it: a kicked skink tumbles, a kicked trooper takes
    * one step back, and something heavy enough doesn't move at all. Omitted means human-ish.
    */
@@ -51,6 +57,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   dustRat: {
     id: 'dustRat',
     weight: 4,
+    cowardly: true,
     name: 'dust rat',
     glyph: 'r',
     fg: '#c08552',
@@ -90,6 +97,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   duneRunner: {
     id: 'duneRunner',
     weight: 45,
+    cowardly: true,
     name: 'dune runner',
     glyph: 'L',
     fg: '#b8860b',
@@ -163,6 +171,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   wakeRaider: {
     id: 'wakeRaider',
     weight: 75,
+    cowardly: true,
     name: 'Wake raider',
     glyph: '@',
     fg: '#d06060',

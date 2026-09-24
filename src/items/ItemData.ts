@@ -22,6 +22,11 @@ export interface ItemDef {
   damage?: DamagePacket[];
   /** Open-ended weapon properties rules can ask about, e.g. 'decapitates'. */
   traits?: string[];
+  /**
+   * How well it flies. Added to the throw's to-hit, so a balanced knife lands and a machete
+   * mostly doesn't. Omitted means the default clumsiness of throwing something not meant for it.
+   */
+  throwBonus?: number;
   /** Armour: how much of each damage type it turns. Plate stops a cut far better than a thrust. */
   resist?: Resistances;
   armorValue?: number;
@@ -44,6 +49,44 @@ export const ITEMS: Record<string, ItemDef> = {
     accuracyBonus: 0,
     damage: [{ type: 'cut', min: 2, max: 4 }],
     traits: ['decapitates'],
+    throwBonus: -30, // heavy, unbalanced, and it tumbles
+  },
+
+  /** Light, balanced, and meant to leave your hand. */
+  throwingKnife: {
+    id: 'throwingKnife',
+    name: 'throwing knife',
+    glyph: ')',
+    fg: '#d8d8d8',
+    category: 'weapon',
+    slot: 'weapon',
+    maxDurability: 15,
+    value: 9,
+    stackable: false,
+    attackVerb: 'stab',
+    accuracyBonus: 1,
+    damage: [
+      { type: 'pierce', min: 1, max: 3 },
+      { type: 'cut', min: 1, max: 2 },
+    ],
+    throwBonus: 20,
+  },
+
+  /** Barely a weapon in the hand. In the air it's the best thing you own. */
+  dart: {
+    id: 'dart',
+    name: 'dart',
+    glyph: '/',
+    fg: '#b0c4de',
+    category: 'weapon',
+    slot: 'weapon',
+    maxDurability: 8,
+    value: 3,
+    stackable: true,
+    attackVerb: 'jab',
+    accuracyBonus: -1,
+    damage: [{ type: 'pierce', min: 1, max: 2 }],
+    throwBonus: 30,
   },
 
   /** Armour turns a cut far better than a thrust, so this beats the machete against people. */
@@ -60,6 +103,7 @@ export const ITEMS: Record<string, ItemDef> = {
     attackVerb: 'thrust',
     accuracyBonus: 1,
     damage: [{ type: 'pierce', min: 2, max: 5 }],
+    throwBonus: 10, // a spear is half a javelin
   },
 
   /** The answer to a carapace, which turns blades and points alike. Clumsy against everything else. */
@@ -76,6 +120,7 @@ export const ITEMS: Record<string, ItemDef> = {
     attackVerb: 'swing',
     accuracyBonus: -1,
     damage: [{ type: 'bludgeon', min: 2, max: 6 }],
+    throwBonus: -40, // you may as well drop it on your own foot
   },
 
   paddedVest: {

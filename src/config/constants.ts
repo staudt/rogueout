@@ -59,3 +59,12 @@ export const MAX_TRAVEL_DISTANCE = 200;
  * runs for every blocked hunter every turn.
  */
 export const DETOUR_NODE_BUDGET = 150;
+
+/** How far word of a fight spreads to faction-mates who could plausibly have seen it. */
+export const ALERT_RADIUS = 8;
+
+/** Throwing something not designed to be thrown. Weapons override it (ItemDef.throwBonus). */
+export const DEFAULT_THROW_BONUS = -20;
+
+/** How much worse a boot is than a hand at aiming a loose object. */
+export const KICK_ACCURACY_PENALTY = 20;

@@ -39,69 +39,69 @@ export const UNARMED_VERB = 'strike';
 
 const PLAYER_HIT: Record<Severity, readonly string[]> = {
   graze: [
-    'You graze the {target}.',
-    'You clip the {target}.',
-    'You catch the {target}, barely.',
-    'You scrape the {target}.',
+    'You graze {target}.',
+    'You clip {target}.',
+    'You catch {target}, barely.',
+    'You scrape {target}.',
   ],
   solid: [
-    'You {verb} the {target}.',
-    'You hit the {target}.',
-    'You {verb} the {target} solidly.',
-    'You land a hit on the {target}.',
+    'You {verb} {target}.',
+    'You hit {target}.',
+    'You {verb} {target} solidly.',
+    'You land a hit on {target}.',
   ],
   heavy: [
-    'You {verb} the {target} hard.',
-    'You hit the {target} hard.',
-    'You tear into the {target}.',
-    'You {verb} the {target} and it staggers.',
+    'You {verb} {target} hard.',
+    'You hit {target} hard.',
+    'You tear into {target}.',
+    'You {verb} {target} and it staggers.',
   ],
 };
 
 const PLAYER_MISS: readonly string[] = [
-  'You miss the {target}.',
-  'You swing at the {target} and miss.',
-  'The {target} dodges.',
+  'You miss {target}.',
+  'You swing at {target} and miss.',
+  '{target} dodges.',
   'You miss.',
 ];
 
 /** The blow landed and the target didn't care — a spear against something with nothing to pierce. */
 const PLAYER_SHRUGGED: readonly string[] = [
-  'You hit the {target}. No effect.',
-  'Your hit does nothing to the {target}.',
-  'You {verb} the {target}. Nothing happens.',
+  'You hit {target}. No effect.',
+  'Your hit does nothing to {target}.',
+  'You {verb} {target}. Nothing happens.',
 ];
 
 /** Only reachable with a weapon that can take a head off, against something that has one. */
 const PLAYER_DECAPITATION: readonly string[] = [
-  "You cut the {target}'s head off.",
-  "You take the {target}'s head off.",
-  'You behead the {target}.',
+  "You cut {target}'s head off.",
+  "You take {target}'s head off.",
+  'You behead {target}.',
 ];
 
 const PLAYER_KILL: readonly string[] = [
-  'You kill the {target}.',
-  'The {target} drops.',
-  'The {target} goes down.',
-  'You put the {target} down.',
+  'You kill {target}.',
+  '{target} drops.',
+  '{target} goes down.',
+  'You put {target} down.',
 ];
 
 const MONSTER_HIT: Record<Severity, readonly string[]> = {
-  graze: ['The {attacker} grazes you.', 'The {attacker} clips you.', 'The {attacker} catches you, barely.'],
-  solid: ['The {attacker} hits you.', 'The {attacker} connects.', 'The {attacker} lands a hit.'],
-  heavy: ['The {attacker} hits you hard.', 'The {attacker} slams into you.', 'The {attacker} tears into you.'],
+  graze: ['{attacker} grazes you.', '{attacker} clips you.', '{attacker} catches you, barely.'],
+  solid: ['{attacker} hits you.', '{attacker} connects.', '{attacker} lands a hit.'],
+  heavy: ['{attacker} hits you hard.', '{attacker} slams into you.', '{attacker} tears into you.'],
 };
 
 const MONSTER_SHRUGGED: readonly string[] = [
-  'The {attacker} hits you. No effect.',
-  "The {attacker}'s hit does nothing.",
+  '{attacker} hits you. No effect.',
+  "{attacker}'s hit does nothing.",
 ];
 
 const MONSTER_MISS: readonly string[] = [
-  'The {attacker} misses you.',
-  'The {attacker} swings and misses.',
-  'You dodge the {attacker}.',
-  'The {attacker} misses.',
+  '{attacker} misses you.',
+  '{attacker} swings and misses.',
+  'You dodge {attacker}.',
+  '{attacker} misses.',
 ];
 
 export interface PlayerAttack {
@@ -168,8 +168,8 @@ export function narrateCondition(hp: number, maxHp: number): string | null {
 /** Said once, as the player crosses into trouble — not repeated every turn after. */
 const RESISTED: readonly string[] = [
   'Your {verb} barely gets through.',
-  'The {target} turns most of it.',
-  'Wrong tool for the {target}.',
+  '{target} turns most of it.',
+  'Wrong tool for {target}.',
 ];
 
 /**
@@ -204,27 +204,35 @@ export function pickPhrase(options: readonly string[], seed: number): string {
   return options[index] ?? options[0]!;
 }
 
+/**
+ * Fills a template and capitalises the result.
+ *
+ * Templates carry bare placeholders rather than "the {target}", because the caller knows whether
+ * the thing has a name ("Corporal Vance") or a kind ("the giant rat"). That means a line can now
+ * start with a lowercase label, so the sentence is capitalised here instead.
+ */
 function fill(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole);
+  const filled = template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole);
+  return filled.charAt(0).toUpperCase() + filled.slice(1);
 }
 
 const BYSTANDER_HIT: readonly string[] = [
-  'The {attacker} hits the {target}.',
-  'The {attacker} lands a hit on the {target}.',
-  'The {attacker} connects with the {target}.',
+  '{attacker} hits {target}.',
+  '{attacker} lands a hit on {target}.',
+  '{attacker} connects with {target}.',
 ];
 
 const BYSTANDER_MISS: readonly string[] = [
-  'The {attacker} misses the {target}.',
-  'The {attacker} swings at the {target} and misses.',
+  '{attacker} misses {target}.',
+  '{attacker} swings at {target} and misses.',
 ];
 
 const BYSTANDER_KILL: readonly string[] = [
-  'The {attacker} kills the {target}.',
-  'The {target} goes down.',
+  '{attacker} kills {target}.',
+  '{target} goes down.',
 ];
 
-const BYSTANDER_SHRUGGED: readonly string[] = ['The {attacker} hits the {target}. No effect.'];
+const BYSTANDER_SHRUGGED: readonly string[] = ['{attacker} hits {target}. No effect.'];
 
 export interface BystanderAttack {
   attacker: string;

@@ -6,6 +6,7 @@ import { MONSTERS } from '../src/entities/MonsterData';
 import { createPlayer } from '../src/entities/Player';
 import { createNpc } from '../src/entities/Npc';
 import { dropLoot } from '../src/combat/Death';
+import { alertAllies, provoke } from '../src/ai/Actors';
 import { ITEMS } from '../src/items/ItemData';
 import { chebyshevDistance } from '../src/utils/geometry';
 import { createVisibility, markVisible } from '../src/fov/VisibilityState';
@@ -291,5 +292,127 @@ describe('hunters go around obstructions', () => {
     for (let turn = 0; turn < 5; turn++) runMonsterTurns(state, createRNG(turn + 1));
 
     expect([hunter.x, hunter.y]).toEqual([1, 2]);
+  });
+});
+
+describe('word gets around', () => {
+  it('a victim\'s nearby faction-mates take it personally too', () => {
+    const region = openArena(30, 12);
+    const victim = createMonster(MONSTERS['restorationTrooper']!, 10, 5);
+    const nearby = createMonster(MONSTERS['restorationTrooper']!, 12, 6);
+    const faraway = createMonster(MONSTERS['restorationTrooper']!, 28, 10);
+    const stranger = createMonster(MONSTERS['wakeRaider']!, 11, 5);
+    region.monsters.push(victim, nearby, faraway, stranger);
+
+    provoke(victim, 'player');
+    alertAllies(region, victim, 'player');
+
+    expect(nearby.provokedBy).toContain('player'); // saw it happen
+    expect(faraway.provokedBy).toEqual([]); // too far to have noticed
+    expect(stranger.provokedBy).toEqual([]); // not their quarrel
+  });
+
+  it('reaches people as well as creatures', () => {
+    const region = openArena(20, 12);
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 8, 5);
+    const bystander = createNpc('b', 'Bystander', '@', '#fff', 9, 5, 'hm', undefined, 'restoration');
+    region.monsters.push(trooper);
+    region.npcs.push(bystander);
+
+    provoke(trooper, 'player');
+    alertAllies(region, trooper, 'player');
+
+    expect(bystander.provokedBy).toContain('player');
+  });
+});
+
+describe('townsfolk are people, not scenery', () => {
+  it('can be attacked, and fight back once they have been', () => {
+    const region = openArena();
+    const civilian = createNpc('c', 'Civilian', '@', '#fff', 3, 4, 'hm', undefined, 'restoration');
+    region.npcs.push(civilian);
+    const state = arenaState(region, 2, 4);
+    civilian.provokedBy.push('player');
+
+    // One RNG across the fight, and long enough that a civilian's poor odds still connect.
+    const rng = createRNG(7);
+    const before = state.player.hp;
+    for (let turn = 0; turn < 40; turn++) {
+      state.turnCount = turn;
+      runNpcTurns(state, rng);
+    }
+
+    expect(state.player.hp).toBeLessThan(before);
+  });
+
+  it('are what makes a raid on a settlement possible at all', () => {
+    // The Wake is hostile to the Restoration; a raider should go for a settler unprompted.
+    const region = openArena(24, 9);
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 4);
+    const settler = createNpc('s', 'Settler', '@', '#fff', 9, 4, 'hm', undefined, 'restoration');
+    region.monsters.push(raider);
+    region.npcs.push(settler);
+    const state = arenaState(region, 22, 8); // player far away and uninvolved
+
+    const before = settler.hp;
+    for (let turn = 0; turn < 12; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+    }
+
+    expect(settler.hp).toBeLessThan(before);
+    expect(state.player.hp).toBe(state.player.maxHp);
+  });
+});
+
+describe('morale', () => {
+  it('the Wake break and run once badly hurt', () => {
+    const region = openArena(24, 9);
+    const raider = createMonster(MONSTERS['wakeRaider']!, 6, 4);
+    raider.hp = 2; // badly hurt
+    region.monsters.push(raider);
+    const state = arenaState(region, 4, 4);
+
+    const before = chebyshevDistance(raider, state.player);
+    for (let turn = 0; turn < 4; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+    }
+
+    expect(chebyshevDistance(raider, state.player)).toBeGreaterThan(before);
+    expect(state.messageLog.join(' ')).toMatch(/breaks and runs/);
+  });
+
+  it('disciplined troops do not', () => {
+    const region = openArena(24, 9);
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 6, 4);
+    trooper.hp = 2;
+    trooper.provokedBy.push('player');
+    region.monsters.push(trooper);
+    const state = arenaState(region, 4, 4);
+
+    const before = chebyshevDistance(trooper, state.player);
+    for (let turn = 0; turn < 3; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+    }
+
+    expect(chebyshevDistance(trooper, state.player)).toBeLessThanOrEqual(before);
+  });
+
+  it('the feral have not the wit to be afraid', () => {
+    const region = openArena(24, 9);
+    const ghoul = createMonster(MONSTERS['feralGhoul']!, 8, 4);
+    ghoul.hp = 1;
+    region.monsters.push(ghoul);
+    const state = arenaState(region, 4, 4);
+
+    const before = chebyshevDistance(ghoul, state.player);
+    for (let turn = 0; turn < 3; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+    }
+
+    expect(chebyshevDistance(ghoul, state.player)).toBeLessThan(before);
   });
 });

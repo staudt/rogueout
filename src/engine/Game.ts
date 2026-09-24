@@ -30,6 +30,8 @@ import { InputManager, type ActionKey } from '../input/InputManager';
 import { MouseInput } from '../input/MouseInput';
 import {
   AUTO_TRAVEL_STEP_MS,
+  DEFAULT_THROW_BONUS,
+  KICK_ACCURACY_PENALTY,
   KICK_ITEM_RANGE,
   MAX_TRAVEL_DISTANCE,
   THROW_RANGE,
@@ -549,9 +551,11 @@ export class Game {
     const vector = DIRECTION_VECTORS[direction];
     const target = { x: this.state.player.x + vector.x, y: this.state.player.y + vector.y };
 
-    const monster = region.monsters.find((m) => m.hp > 0 && m.x === target.x && m.y === target.y);
-    if (monster) {
-      const outcome = kickCreature(monster, direction, this.state, region, this.rng);
+    const victim = [...region.monsters, ...region.npcs].find(
+      (a) => a.hp > 0 && a.x === target.x && a.y === target.y,
+    );
+    if (victim) {
+      const outcome = kickCreature(victim, direction, this.state, region, this.rng);
       if (outcome.tookTurn) this.turnManager.advanceTurn();
       this.render();
       return;
@@ -573,6 +577,8 @@ export class Game {
           this.state,
           region,
           this.rng,
+          // A boot is worse than an arm even with something meant for throwing.
+          (def?.throwBonus ?? DEFAULT_THROW_BONUS) - KICK_ACCURACY_PENALTY,
         );
         region.groundItems.push({ item: ground.item, x: result.landedAt.x, y: result.landedAt.y });
       }
@@ -636,6 +642,7 @@ export class Game {
       this.state,
       region,
       this.rng,
+      def.throwBonus,
     );
     region.groundItems.push({ item: thrown, x: result.landedAt.x, y: result.landedAt.y });
 
