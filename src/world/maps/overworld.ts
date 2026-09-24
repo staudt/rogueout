@@ -5,6 +5,10 @@ import { scatterPois, type Poi } from '../generation/poi';
 import type { Rect } from '../generation/Rect';
 import { carveCorridor } from '../generation/stitching';
 import { generateWilderness } from '../generation/wilderness';
+import type { Point } from '../../utils/geometry';
+
+/** One waypoint every few road tiles. Patrols walk between them, not along every kerbstone. */
+const PATROL_WAYPOINT_SPACING = 6;
 
 /**
  * The overworld: town and open wilderness as ONE continuous map, not separate regions — walking
@@ -58,6 +62,11 @@ export interface GeneratedOverworld {
   map: GameMapData;
   /** Generated points of interest, with the content each one holds. Placed by RegionRegistry. */
   pois: Poi[];
+  /**
+   * Waypoints along the carved road, west to east. Patrols walk these, which is how two hostile
+   * groups end up meeting: the road is the only thing on this map that everyone uses.
+   */
+  patrolRoute: Point[];
 }
 
 export function generateOverworld(seed: number = OVERWORLD_SEED): GeneratedOverworld {
@@ -90,7 +99,10 @@ export function generateOverworld(seed: number = OVERWORLD_SEED): GeneratedOverw
     .filter((poi) => isWalkable(map, poi.x, poi.y))
     .map((poi) => (poi.guard && !isWalkable(map, poi.guard.x, poi.guard.y) ? { ...poi, guard: undefined } : poi));
 
-  return { map, pois: survivingPois };
+  // Every few tiles is enough: a patrol walks between waypoints, it doesn't trace the kerb.
+  const patrolRoute = road.filter((_, index) => index % PATROL_WAYPOINT_SPACING === 0);
+
+  return { map, pois: survivingPois, patrolRoute };
 }
 
 function buildTown(map: GameMapData): void {

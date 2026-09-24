@@ -259,3 +259,32 @@ describe('what a witness decides on arrival', () => {
     expect(distantMilitia.provokedBy).toContain('player'); // their own, so they already know
   });
 });
+
+describe('giving up on an errand', () => {
+  it('abandons a noise it cannot reach, instead of standing there forever', () => {
+    // The arrival check needs them to actually *get* to the spot, so anything unreachable used
+    // to freeze an actor for the rest of the game — found by watching one trooper stand in the
+    // road for a hundred turns.
+    const map = createGameMap(14, 7, 'wall');
+    for (let y = 1; y < 6; y++) for (let x = 1; x < 5; x++) setTileId(map, x, y, 'floor');
+    for (let y = 1; y < 6; y++) for (let x = 9; x < 13; x++) setTileId(map, x, y, 'floor');
+    const visibility = createVisibility(14, 7);
+    for (let y = 0; y < 7; y++) for (let x = 0; x < 14; x++) markVisible(visibility, x, y);
+    const region: RegionState = { map, daylight: false, monsters: [], groundItems: [], npcs: [], visibility };
+
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 2, 3);
+    region.monsters.push(trooper);
+    const state = stateFor(region, 3, 5);
+    trooper.investigating = { x: 11, y: 3, offender: 'wake', victimFaction: 'restoration' }; // walled off
+
+    const seen = new Set<string>();
+    for (let turn = 0; turn < 8; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+      seen.add(`${trooper.x},${trooper.y}`);
+    }
+
+    expect(trooper.investigating ?? null).toBeNull(); // gave up
+    expect(seen.size).toBeGreaterThan(1); // and got on with something else
+  });
+});

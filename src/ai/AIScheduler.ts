@@ -4,6 +4,7 @@ import { randomInt, type RNG } from '../utils/RNG';
 import { addPoints, chebyshevDistance, DIRECTION_VECTORS, type Direction, type Point } from '../utils/geometry';
 import { isWalkable } from '../world/GameMap';
 import { MONSTERS } from '../entities/MonsterData';
+import type { Monster } from '../entities/Monster';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
 import { dropLoot } from '../combat/Death';
 import { recomputePlayerCombatStats } from '../entities/Player';
@@ -28,7 +29,13 @@ import {
   type Provokable,
 } from './Actors';
 import { isVisible } from '../fov/VisibilityState';
-import { DETOUR_NODE_BUDGET, MAX_ACTIONS_PER_TURN, NORMAL_SPEED } from '../config/constants';
+import {
+  DETOUR_NODE_BUDGET,
+  MAX_ACTIONS_PER_TURN,
+  NORMAL_SPEED,
+  SCAVENGE_RADIUS,
+} from '../config/constants';
+import { nearestLoot, scavengeHere, scavenges } from './Scavenging';
 import { findPath } from '../pathfinding/BFS';
 
 const ALL_DIRECTIONS: readonly Direction[] = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'];
@@ -113,19 +120,42 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
   // Nothing to fight, but something was heard. Go and see, then make up your mind.
   if (actor.investigating) {
     if (chebyshevDistance(actor, actor.investigating) > 1) {
+      const before = { x: actor.x, y: actor.y };
       moveToward(actor, actor.investigating, state, region);
-      return;
-    }
 
-    const tookItUp = resolveInvestigation(actor);
-    if (tookItUp && isVisible(region.visibility, actor.x, actor.y)) {
-      addMessage(state, `${actorLabel(actor)} has seen enough.`.replace(/^./, (c) => c.toUpperCase()));
+      // Couldn't get any closer — across water, behind a ridge, or simply too far to path. Give
+      // up rather than stand there forever: the arrival check needs them to *reach* the place,
+      // so an unreachable errand used to freeze an actor for the rest of the game.
+      if (before.x === actor.x && before.y === actor.y) {
+        actor.investigating = null;
+      } else {
+        return;
+      }
+    } else {
+      const tookItUp = resolveInvestigation(actor);
+      if (tookItUp && isVisible(region.visibility, actor.x, actor.y)) {
+        addMessage(state, `${actorLabel(actor)} has seen enough.`.replace(/^./, (c) => c.toUpperCase()));
+      }
+      // They may now have someone to deal with; the next action will find them.
     }
-    // They may now have someone to deal with; the next action will find them.
   }
 
   // Nothing in sight any more: they'll shout again next time something turns up.
   actor.calledOut = false;
+
+  // On the road, and nothing else to do: keep walking it.
+  if (actor.kind === 'monster' && patrolStep(actor, state, region)) return;
+
+  // Nothing to fight and nowhere to be: pick the ground clean.
+  if (scavenges(actor)) {
+    if (scavengeHere(state, region, actor)) return;
+    const loot = nearestLoot(region, actor, SCAVENGE_RADIUS);
+    if (loot) {
+      moveToward(actor, loot, state, region);
+      return;
+    }
+  }
+
   wander(actor, state, region, rng);
 }
 
@@ -369,4 +399,39 @@ export function runNpcTurns(state: GameState, rng: RNG): void {
   }
 
   region.npcs = region.npcs.filter((n) => n.hp > 0);
+}
+
+/**
+ * One step of a patrol along the region's road.
+ *
+ * Waypoints are walked in order and wrap, so a group paces the same route indefinitely. That
+ * regularity is the point: two hostile patrols on one road will meet, whereas two groups
+ * wandering at random on a 70x30 map essentially never would.
+ */
+function patrolStep(monster: Monster, state: GameState, region: RegionState): boolean {
+  if (monster.patrolIndex === undefined) return false; // not one of the road bands
+  const route = region.patrolRoute;
+  if (!route || route.length === 0) return false;
+
+  const index = monster.patrolIndex;
+  const waypoint = route[index % route.length]!;
+
+  if (chebyshevDistance(monster, waypoint) <= 1) {
+    monster.patrolIndex = (index + 1) % route.length;
+    return false; // arrived; spend the action on whatever else is going on
+  }
+
+  // Deliberately the same mover the hunting AI uses, detour search and all. A hand-rolled
+  // three-candidate step was tried first and produced patrollers who wedged themselves against a
+  // rock and stood there for the rest of the game.
+  const before = { x: monster.x, y: monster.y };
+  moveToward(monster, waypoint, state, region);
+
+  if (before.x === monster.x && before.y === monster.y) {
+    // Wedged, or the route is unreachable from here. Try the next waypoint rather than sulk.
+    monster.patrolIndex = (index + 1) % route.length;
+    return false;
+  }
+
+  return true;
 }

@@ -55,7 +55,8 @@ describe('save/load round trip', () => {
     expect(loaded!.player.inventory.map((i) => i.defId)).toEqual(['machete']);
     expect(loaded!.turnCount).toBe(state.turnCount);
     expect(loaded!.activeRegionId).toBe('overworld');
-    expect(loaded!.messageLog).toContain('You do something memorable.');
+    // Joined rather than per-line: everything from one player turn shares a log line.
+    expect(loaded!.messageLog.join(' ')).toContain('You do something memorable.');
     expect(loaded!.gameOver).toBe(false);
   });
 

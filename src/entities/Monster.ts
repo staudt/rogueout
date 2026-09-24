@@ -1,4 +1,5 @@
 import type { Entity } from './Entity';
+import type { Item } from '../items/Item';
 import type { Investigation } from '../ai/Actors';
 import type { Combatant } from '../combat/Combatant';
 import type { MonsterBehavior, MonsterDef } from './MonsterData';
@@ -21,6 +22,8 @@ export interface Monster extends Entity, Combatant {
    * Per-creature, not per-faction: spearing one lizard does not turn every lizard against you.
    */
   provokedBy: FactionId[];
+  /** Things taken off the ground. Dropped again on death — a raider is a moving pile of loot. */
+  carried?: Item[];
   /** Roughly kilograms; read by knockback. */
   weight: number;
   /** Set once its nerve goes, so "it breaks and runs" is said when it happens and not after. */
@@ -31,6 +34,12 @@ export interface Monster extends Entity, Combatant {
   hasScreamed?: boolean;
   /** Set while shouting about an enemy it can see; cleared when it loses sight of one. */
   calledOut?: boolean;
+  /**
+   * Which waypoint of the region's patrol route it's heading for — and, by its presence, whether
+   * this individual patrols at all. Deliberately an instance property rather than a species one:
+   * *this band* walks the road, while a raider set to guard a ruin stays at the ruin.
+   */
+  patrolIndex?: number;
 }
 
 let nextInstanceId = 0;

@@ -36,6 +36,11 @@ export interface MonsterDef {
   /** What it leaves behind. Humans carry their gear; animals don't.  */
   drops?: MonsterDrop[];
   /**
+   * Picks things up off the ground, uses them if they're better than what it has, and drops the
+   * lot when it dies. The Wake live by it; a lizard has no pockets.
+   */
+  scavenges?: boolean;
+  /**
    * Whether it breaks and runs once badly hurt. Morale, as data: the Wake are in it for
    * themselves and will not die for it; Restoration troopers are disciplined; the feral don't
    * have the wit to be afraid.
@@ -172,6 +177,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
     id: 'wakeRaider',
     weight: 75,
     cowardly: true,
+    scavenges: true,
     name: 'Wake raider',
     glyph: '@',
     fg: '#d06060',
@@ -197,6 +203,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   restorationTrooper: {
     id: 'restorationTrooper',
     weight: 85,
+    scavenges: true,
     name: 'Restoration trooper',
     glyph: '@',
     fg: '#c8b88a',

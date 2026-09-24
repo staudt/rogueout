@@ -1,4 +1,5 @@
 import type { Entity } from './Entity';
+import type { Item } from '../items/Item';
 import type { Investigation } from '../ai/Actors';
 import type { Combatant } from '../combat/Combatant';
 import { type FactionId } from '../world/Factions';
@@ -46,6 +47,8 @@ export interface Npc extends Entity, Combatant {
   energy: number;
   weight: number;
   awarenessRadius: number;
+  /** Things taken off the ground. Dropped again on death — a raider is a moving pile of loot. */
+  carried?: Item[];
   /** What they're visibly carrying. Recorded so it drops when they die, rather than vanishing. */
   weaponDefId?: string;
   armorDefId?: string;

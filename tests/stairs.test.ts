@@ -95,6 +95,6 @@ describe('waiting', () => {
 
     expect(state.turnCount).toBe(1);
     // Phrasing varies, but deterministically: the seed is the turn the wait happened on.
-    expect(state.messageLog).toContain(narrateWaiting(0));
+    expect(state.messageLog.join(' ')).toContain(narrateWaiting(0));
   });
 });

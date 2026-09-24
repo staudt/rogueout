@@ -24,6 +24,13 @@ export function dropLoot(actor: Provokable, region: RegionState, rng: RNG, kille
     region.groundItems.push({ item: createItem(defId), x: actor.x, y: actor.y });
   }
 
+  // Everything they'd scavenged comes straight back out. A raider who has walked a battlefield is
+  // carrying the battlefield, which is what makes hunting the hunters worthwhile.
+  for (const item of actor.carried ?? []) {
+    region.groundItems.push({ item, x: actor.x, y: actor.y });
+  }
+  actor.carried = [];
+
   const table: LootEntry[] = [
     ...(actor.kind === 'monster' ? (MONSTERS[actor.defId]?.drops ?? []) : []),
     ...(FACTION_LOOT[actor.faction] ?? []),

@@ -50,8 +50,37 @@ function makeRegionState(
   groundItems: GroundItem[] = [],
   npcs: Npc[] = [],
   daylight = false,
+  patrolRoute?: Array<{ x: number; y: number }>,
 ): RegionState {
-  return { map, daylight, monsters, groundItems, npcs, visibility: createVisibility(map.width, map.height) };
+  return {
+    map,
+    daylight,
+    monsters,
+    groundItems,
+    npcs,
+    patrolRoute,
+    visibility: createVisibility(map.width, map.height),
+  };
+}
+
+/**
+ * A band walking the road together, spaced out along it.
+ *
+ * Spawned as a group rather than scattered because that is the whole threat: one raider is a
+ * fight you win, four arriving together is a decision about whether to be on the road at all.
+ */
+function patrol(defId: string, route: Array<{ x: number; y: number }>, start: number, size: number): Monster[] {
+  const def = MONSTERS[defId];
+  if (!def || route.length === 0) return [];
+
+  const band: Monster[] = [];
+  for (let i = 0; i < size; i++) {
+    const at = route[(start + i) % route.length]!;
+    const member = createMonster(def, at.x, at.y);
+    member.patrolIndex = (start + i) % route.length;
+    band.push(member);
+  }
+  return band;
 }
 
 export const REGIONS: Record<string, RegionDef> = {
@@ -63,10 +92,16 @@ export const REGIONS: Record<string, RegionDef> = {
     createState: () => {
       // The map arrives with its procedural POIs already decided (see maps/overworld.ts); all
       // this does is turn each one into the concrete monsters/items it described.
-      const { map, pois } = generateOverworld();
+      const { map, pois, patrolRoute } = generateOverworld();
       return makeRegionState(
         map,
-        poiGuards(pois),
+        [
+          ...poiGuards(pois),
+          // Two bands walking the same road in opposite directions. Nobody scripts the ambush;
+          // the road does it.
+          ...patrol('wakeRaider', patrolRoute, Math.floor(patrolRoute.length * 0.55), 4),
+          ...patrol('restorationTrooper', patrolRoute, Math.floor(patrolRoute.length * 0.2), 3),
+        ],
         [
           { item: createItem('medPack', 1), x: OVERWORLD_HERB_POS.x, y: OVERWORLD_HERB_POS.y },
           ...poiLoot(pois),
@@ -191,6 +226,7 @@ export const REGIONS: Record<string, RegionDef> = {
           ),
         ],
         true, // open sky
+        patrolRoute,
       );
     },
     transitions: [

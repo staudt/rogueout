@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { dropLoot } from '../src/combat/Death';
+import { nearestLoot, scavengeHere, scavenges } from '../src/ai/Scavenging';
+import { runMonsterTurns } from '../src/ai/AIScheduler';
+import { createItem } from '../src/items/Item';
+import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
+import { areHostile } from '../src/world/Factions';
+import { isWalkable } from '../src/world/GameMap';
+import { createRNG } from '../src/utils/RNG';
 import { callOutEnemy, noticeCorpses } from '../src/ai/Actors';
 import { createMonster } from '../src/entities/Monster';
 import { MONSTERS } from '../src/entities/MonsterData';
@@ -177,5 +184,137 @@ describe('calling out an enemy', () => {
 
     expect(lizard.calledOut).toBeFalsy();
     expect(state.messageLog.join(' ')).not.toMatch(/shouts/);
+  });
+});
+
+describe('scavengers', () => {
+  it('take what is underfoot, and it costs them the turn', () => {
+    const r = region();
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 5);
+    r.monsters.push(raider);
+    r.groundItems.push({ item: createItem('machete'), x: 5, y: 5 });
+
+    expect(scavengeHere(stateFor(r), r, raider)).toBe(true);
+    expect(r.groundItems).toHaveLength(0);
+    expect(raider.carried?.map((i) => i.defId)).toEqual(['machete']);
+  });
+
+  it('use a find when it beats what they are swinging', () => {
+    const r = region();
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 5); // cut 2-4
+    r.monsters.push(raider);
+    r.groundItems.push({ item: createItem('pipeWrench'), x: 5, y: 5 }); // bludgeon 2-6
+
+    scavengeHere(stateFor(r), r, raider);
+
+    expect(raider.damage[0]!.type).toBe('bludgeon');
+  });
+
+  it('but not a worse one', () => {
+    const r = region();
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 5);
+    r.monsters.push(raider);
+    r.groundItems.push({ item: createItem('dart'), x: 5, y: 5 }); // pierce 1-2
+
+    scavengeHere(stateFor(r), r, raider);
+
+    expect(raider.damage[0]!.type).toBe('cut'); // kept its blade
+    expect(raider.carried?.map((i) => i.defId)).toEqual(['dart']); // took it anyway
+  });
+
+  it('leave bodies where they lie', () => {
+    const r = region();
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 5);
+    r.monsters.push(raider);
+    const corpse = createItem('corpse');
+    corpse.corpse = { name: 'someone', faction: 'settlers', killedBy: 'wake' };
+    r.groundItems.push({ item: corpse, x: 5, y: 5 });
+
+    expect(scavengeHere(stateFor(r), r, raider)).toBe(false);
+    expect(r.groundItems).toHaveLength(1);
+  });
+
+  it('give everything back when killed — a raider is a moving pile of loot', () => {
+    const r = region();
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 5);
+    r.monsters.push(raider);
+    for (const defId of ['machete', 'paddedVest', 'medPack']) {
+      r.groundItems.push({ item: createItem(defId), x: 5, y: 5 });
+      scavengeHere(stateFor(r), r, raider);
+    }
+    expect(r.groundItems).toHaveLength(0);
+
+    dropLoot(raider, r, never);
+
+    expect(dropped(r)).toEqual(expect.arrayContaining(['machete', 'paddedVest', 'medPack']));
+    expect(raider.carried).toEqual([]);
+  });
+
+  it('will walk to something nearby, but not across the map for it', () => {
+    const r = region();
+    const raider = createMonster(MONSTERS['wakeRaider']!, 5, 5);
+    r.groundItems.push({ item: createItem('machete'), x: 9, y: 7 });
+
+    expect(nearestLoot(r, raider, 8)).toEqual({ x: 9, y: 7 });
+    expect(nearestLoot(r, raider, 2)).toBeNull();
+  });
+
+  it('only some things scavenge', () => {
+    expect(scavenges(createMonster(MONSTERS['wakeRaider']!, 1, 1))).toBe(true);
+    expect(scavenges(createMonster(MONSTERS['duneRunner']!, 1, 1))).toBe(false);
+  });
+});
+
+describe('patrols', () => {
+  it('the overworld spawns two hostile bands on the same road', () => {
+    const regions: Record<string, RegionState> = {};
+    const overworld = ensureRegionLoaded(regions, 'overworld');
+
+    const wake = overworld.monsters.filter((m) => m.defId === 'wakeRaider');
+    const restoration = overworld.monsters.filter((m) => m.defId === 'restorationTrooper');
+
+    expect(wake.length).toBeGreaterThanOrEqual(3);
+    expect(restoration.length).toBeGreaterThanOrEqual(3);
+    expect(areHostile('wake', 'restoration')).toBe(true);
+  });
+
+  it('puts them on the road, which is what makes them meet', () => {
+    const regions: Record<string, RegionState> = {};
+    const overworld = ensureRegionLoaded(regions, 'overworld');
+
+    expect(overworld.patrolRoute?.length).toBeGreaterThan(3);
+    const patrollers = overworld.monsters.filter((m) => m.patrolIndex !== undefined);
+    expect(patrollers.length).toBeGreaterThanOrEqual(6);
+    for (const patroller of patrollers) {
+      expect(isWalkable(overworld.map, patroller.x, patroller.y)).toBe(true);
+    }
+
+    // Ruin guards are raiders too, and must stay at their ruin rather than wander off up the road.
+    const guards = overworld.monsters.filter((m) => m.defId === 'wakeRaider' && m.patrolIndex === undefined);
+    expect(guards.every((g) => g.patrolIndex === undefined)).toBe(true);
+  });
+
+  it('walks the route, rather than milling about', () => {
+    const regions: Record<string, RegionState> = {};
+    const overworld = ensureRegionLoaded(regions, 'overworld');
+    const state: GameState = {
+      player: createPlayer(2, 2),
+      regions: { overworld },
+      activeRegionId: 'overworld',
+      turnCount: 0,
+      messageLog: [],
+      gameOver: false,
+    };
+
+    const band = overworld.monsters.filter((m) => m.defId === 'wakeRaider');
+    const start = band.map((m) => `${m.x},${m.y}`);
+
+    for (let turn = 0; turn < 12; turn++) {
+      state.turnCount = turn;
+      runMonsterTurns(state, createRNG(turn + 1));
+    }
+
+    const moved = band.filter((m, i) => `${m.x},${m.y}` !== start[i]).length;
+    expect(moved).toBeGreaterThan(0);
   });
 });

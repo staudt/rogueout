@@ -80,3 +80,6 @@ export const WITNESS_RADIUS = 7;
 
 /** How close you have to be to recognise a body on the ground as somebody you knew. */
 export const CORPSE_NOTICE_RADIUS = 3;
+
+/** How far a scavenger will go out of its way for something lying on the ground. */
+export const SCAVENGE_RADIUS = 8;

@@ -13,6 +13,11 @@ export interface RegionState {
   map: GameMapData;
   /** Lit by the sun: sight is limited by terrain rather than by how far a torch throws. */
   daylight: boolean;
+  /**
+   * Waypoints along the road, in order. Patrols walk it, which is what makes them meet each other
+   * — two groups wandering at random would almost never collide on a map this size.
+   */
+  patrolRoute?: Array<{ x: number; y: number }>;
   monsters: Monster[];
   groundItems: GroundItem[];
   npcs: Npc[];
