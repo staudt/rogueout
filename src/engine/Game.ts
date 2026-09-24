@@ -204,22 +204,27 @@ export class Game {
       return;
     }
 
-    // No route to the tile itself. What to do about that depends entirely on whether the player
-    // has any business knowing why.
-    if (isExplored(region.visibility, target.x, target.y)) {
-      // Ground they've already seen. A wall they clicked on purpose needs no reply — they can
-      // see it's a wall. Anything else explored but unreachable (an island across a lake, a tile
-      // someone is standing in) is worth saying out loud.
-      if (!isWalkable(region.map, target.x, target.y)) return;
-      addMessage(this.state, "You can't find a path there.");
-      this.render();
+    // No route to the tile itself. Either way the answer is to set off and get as close as the
+    // ground allows — what differs is whether the player has earned an explanation.
+    const known = isExplored(region.visibility, target.x, target.y);
+
+    // A wall they can already see needs no reply at all: they clicked a wall on purpose.
+    if (known && !isWalkable(region.map, target.x, target.y)) return;
+
+    const approach = findPathToward(player, target, isPassable);
+    if (!approach || approach.length === 0) {
+      // Nowhere closer to stand. Only worth saying when they know the terrain; for unseen ground
+      // it would be telling them something they haven't discovered.
+      if (known) {
+        addMessage(this.state, "You can't find a path there.");
+        this.render();
+      }
       return;
     }
 
-    // Somewhere they've never been: head that way and let the terrain, not a message, be what
-    // tells them how far they get.
-    const approach = findPathToward(player, target, isPassable);
-    if (!approach || approach.length === 0) return;
+    // Explored ground with no route — a creature holding a one-tile bridge, an island across a
+    // lake. Say why, then walk to the near side rather than refusing to move at all.
+    if (known) addMessage(this.state, "You can't find a way through, so you head as close as you can.");
 
     this.autoTravel.start(approach);
     this.stepAutoTravel();

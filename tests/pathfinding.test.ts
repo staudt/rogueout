@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { findPath, findPathToward } from '../src/pathfinding/BFS';
 import type { Point } from '../src/utils/geometry';
+import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
+import { getTileId, isWalkable, type GameMapData } from '../src/world/GameMap';
+import { OVERWORLD_SPAWN } from '../src/world/maps/overworld';
+import type { RegionState } from '../src/engine/GameState';
 
 function isPassableFor(rows: readonly string[]) {
   return (x: number, y: number): boolean => {
@@ -147,3 +151,51 @@ describe('findPathToward (heading for somewhere you cannot reach)', () => {
 function chebyshev(a: Point, b: Point): number {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 }
+
+describe('a creature holding a one-tile crossing (the real overworld)', () => {
+  // The stitched road crosses a lake on a causeway exactly one tile wide, so a single creature
+  // standing on it severs the map. That is the situation behind "You can't find a path there."
+  // on ground the player has already explored — and the reason a click there should still walk
+  // to the near side instead of refusing outright.
+  const CAUSEWAY = { x: 26, y: 14 };
+  /** Beyond the lake — reachable normally, cut off entirely when the causeway is held. */
+  const FAR_SIDE = { x: 45, y: 1 };
+
+  function overworld() {
+    const regions: Record<string, RegionState> = {};
+    return ensureRegionLoaded(regions, 'overworld').map;
+  }
+
+  const passableExcept = (map: GameMapData, blocked: Point) => (x: number, y: number) =>
+    isWalkable(map, x, y) && !(x === blocked.x && y === blocked.y);
+
+  it('the causeway really is a single-tile chokepoint', () => {
+    const map = overworld();
+    expect(getTileId(map, CAUSEWAY.x, CAUSEWAY.y)).toBe('path');
+    // Hemmed in by water on both sides: there is no way round it.
+    expect(isWalkable(map, CAUSEWAY.x, CAUSEWAY.y - 1)).toBe(false);
+    expect(isWalkable(map, CAUSEWAY.x, CAUSEWAY.y + 1)).toBe(false);
+  });
+
+  it('blocking it genuinely removes the route', () => {
+    const map = overworld();
+    const open = (x: number, y: number) => isWalkable(map, x, y);
+
+    expect(findPath(OVERWORLD_SPAWN, FAR_SIDE, open)).not.toBeNull();
+    expect(findPath(OVERWORLD_SPAWN, FAR_SIDE, passableExcept(map, CAUSEWAY))).toBeNull();
+  });
+
+  it('still walks the player to the water\'s edge instead of refusing', () => {
+    const map = overworld();
+    const isPassable = passableExcept(map, CAUSEWAY);
+
+    const approach = findPathToward(OVERWORLD_SPAWN, FAR_SIDE, isPassable);
+
+    expect(approach).not.toBeNull();
+    const arrival = approach!.at(-1)!;
+    for (const step of approach!) expect(isPassable(step.x, step.y)).toBe(true);
+    // Meaningfully closer than where they started, and stopped short of the blocked tile.
+    expect(chebyshev(arrival, FAR_SIDE)).toBeLessThan(chebyshev(OVERWORLD_SPAWN, FAR_SIDE));
+    expect(arrival).not.toEqual(CAUSEWAY);
+  });
+});
