@@ -9,8 +9,8 @@ import type { Npc } from '../entities/Npc';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import { OVERWORLD_SPAWN } from '../world/maps/overworld';
 import { isWalkable } from '../world/GameMap';
-import { isVisible } from '../fov/VisibilityState';
-import { findPath } from '../pathfinding/BFS';
+import { isExplored, isVisible } from '../fov/VisibilityState';
+import { findPath, findPathToward } from '../pathfinding/BFS';
 import { AutoTravel } from '../pathfinding/AutoTravel';
 import type { GameState, RegionState } from './GameState';
 import { addMessage, getActiveRegion } from './GameState';
@@ -194,14 +194,32 @@ export class Game {
       return;
     }
 
-    const path = findPath(player, target, this.isPassableIn(region));
-    if (!path || path.length === 0) {
+    const isPassable = this.isPassableIn(region);
+    const path = findPath(player, target, isPassable);
+    if (path && path.length > 0) {
+      this.autoTravel.start(path);
+      this.stepAutoTravel();
+      return;
+    }
+
+    // No route to the tile itself. What to do about that depends entirely on whether the player
+    // has any business knowing why.
+    if (isExplored(region.visibility, target.x, target.y)) {
+      // Ground they've already seen. A wall they clicked on purpose needs no reply — they can
+      // see it's a wall. Anything else explored but unreachable (an island across a lake, a tile
+      // someone is standing in) is worth saying out loud.
+      if (!isWalkable(region.map, target.x, target.y)) return;
       addMessage(this.state, "You can't find a path there.");
       this.render();
       return;
     }
 
-    this.autoTravel.start(path);
+    // Somewhere they've never been: head that way and let the terrain, not a message, be what
+    // tells them how far they get.
+    const approach = findPathToward(player, target, isPassable);
+    if (!approach || approach.length === 0) return;
+
+    this.autoTravel.start(approach);
     this.stepAutoTravel();
   }
 
