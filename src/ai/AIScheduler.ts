@@ -16,7 +16,15 @@ import {
   PLAYER_DEATH,
 } from '../narrative/Narration';
 import { areHostile } from '../world/Factions';
-import { actorLabel, livingActors, reactToAttack, removeActor, type Actor, type Provokable } from './Actors';
+import {
+  actorLabel,
+  livingActors,
+  reactToAttack,
+  removeActor,
+  resolveInvestigation,
+  type Actor,
+  type Provokable,
+} from './Actors';
 import { isVisible } from '../fov/VisibilityState';
 import { DETOUR_NODE_BUDGET, MAX_ACTIONS_PER_TURN, NORMAL_SPEED } from '../config/constants';
 import { findPath } from '../pathfinding/BFS';
@@ -89,14 +97,18 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
     return;
   }
 
-  // Nothing to fight, but something was heard. Go and see.
+  // Nothing to fight, but something was heard. Go and see, then make up your mind.
   if (actor.investigating) {
-    if (chebyshevDistance(actor, actor.investigating) <= 1) {
-      actor.investigating = null;
-    } else {
+    if (chebyshevDistance(actor, actor.investigating) > 1) {
       moveToward(actor, actor.investigating, state, region);
       return;
     }
+
+    const tookItUp = resolveInvestigation(actor);
+    if (tookItUp && isVisible(region.visibility, actor.x, actor.y)) {
+      addMessage(state, `${actorLabel(actor)} has seen enough.`.replace(/^./, (c) => c.toUpperCase()));
+    }
+    // They may now have someone to deal with; the next action will find them.
   }
 
   wander(actor, state, region, rng);

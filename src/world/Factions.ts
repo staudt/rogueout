@@ -17,6 +17,14 @@ export interface FactionDef {
   name: string;
   /** One line on what they want — the shape a quest for them would take. */
   creed?: string;
+  /**
+   * Treats violence against anyone they don't already hate as a crime, and answers it.
+   *
+   * This is what a militia *is*. Without it the Restoration will walk the length of a street to
+   * investigate a scream, look straight at someone beating an almoner, and wander off — which is
+   * exactly what happened before this existed.
+   */
+  keepsOrder?: boolean;
   /** Used to mark creatures on screen when their standing toward the player is worth showing. */
   color: string;
 }
@@ -28,6 +36,7 @@ export const FACTIONS: Record<FactionId, FactionDef> = {
     id: 'restoration',
     name: 'the Restoration',
     creed: 'Order will be restored, by whoever is still holding the rifle.',
+    keepsOrder: true,
     color: '#c8b88a',
   },
   wake: {

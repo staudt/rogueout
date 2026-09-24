@@ -1,4 +1,5 @@
 import type { Entity } from './Entity';
+import type { Investigation } from '../ai/Actors';
 import type { Combatant } from '../combat/Combatant';
 import { type FactionId } from '../world/Factions';
 import { NORMAL_SPEED, DEFAULT_WEIGHT } from '../config/constants';
@@ -35,8 +36,8 @@ export interface Npc extends Entity, Combatant {
    * A Vigil almoner is not a soldier, and pretending otherwise makes every faction feel the same.
    */
   timid?: boolean;
-  /** Somewhere worth a look — a noise they heard. Cleared on arrival. */
-  investigating?: { x: number; y: number } | null;
+  /** A noise they heard, and what it was about. Cleared on arrival (see resolveInvestigation). */
+  investigating?: Investigation | null;
   /** Set once they've raised the alarm, so one incident doesn't produce a scream every turn. */
   hasScreamed?: boolean;
   speed: number;

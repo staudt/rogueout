@@ -1,4 +1,5 @@
 import type { Entity } from './Entity';
+import type { Investigation } from '../ai/Actors';
 import type { Combatant } from '../combat/Combatant';
 import type { MonsterBehavior, MonsterDef } from './MonsterData';
 import type { FactionId } from '../world/Factions';
@@ -24,8 +25,8 @@ export interface Monster extends Entity, Combatant {
   weight: number;
   /** Set once its nerve goes, so "it breaks and runs" is said when it happens and not after. */
   broken?: boolean;
-  /** Somewhere worth a look — a noise it heard. Cleared on arrival. */
-  investigating?: { x: number; y: number } | null;
+  /** A noise it heard, and what it was about. Cleared on arrival (see resolveInvestigation). */
+  investigating?: Investigation | null;
   /** Set once it's raised the alarm, so one incident doesn't produce a shout every turn. */
   hasScreamed?: boolean;
 }

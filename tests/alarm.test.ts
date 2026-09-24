@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertAllies, canRaiseAlarm, raiseAlarm, reactToAttack } from '../src/ai/Actors';
+import { alertAllies, canRaiseAlarm, raiseAlarm, reactToAttack, resolveInvestigation } from '../src/ai/Actors';
 import { runMonsterTurns, runNpcTurns } from '../src/ai/AIScheduler';
 import { createMonster } from '../src/entities/Monster';
 import { MONSTERS } from '../src/entities/MonsterData';
@@ -79,7 +79,8 @@ describe('a scream and what everyone makes of it', () => {
     raiseAlarm(region, victim, 'restoration', 'player');
 
     expect(raider.provokedBy).toEqual([]); // it has formed no opinion
-    expect(raider.investigating).toEqual({ x: 10, y: 5 }); // but it is coming to look
+    // Coming to look, and carrying enough context to judge it when it arrives.
+    expect(raider.investigating).toMatchObject({ x: 10, y: 5, offender: 'player', victimFaction: 'restoration' });
   });
 
   it('is ignored by whoever caused it', () => {
@@ -113,7 +114,7 @@ describe('a scream and what everyone makes of it', () => {
     const onlooker = createMonster(MONSTERS['wakeRaider']!, 20, 10);
     region.monsters.push(onlooker);
     const state = stateFor(region, 38, 18);
-    onlooker.investigating = { x: 10, y: 5 };
+    onlooker.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'restoration' };
 
     const before = chebyshevDistance(onlooker, { x: 10, y: 5 });
     for (let turn = 0; turn < 6; turn++) {
@@ -189,5 +190,36 @@ describe('armed townsfolk', () => {
     expect(unarmed.damage[0]!.type).toBe('bludgeon');
     expect(armed.damage[0]!.type).toBe('cut');
     expect(armed.damage[0]!.max).toBeGreaterThan(unarmed.damage[0]!.max);
+  });
+});
+
+
+describe('what a witness decides on arrival', () => {
+  it('a militia treats an attack on someone they tolerate as a crime', () => {
+    // The Restoration keeps order. That claim has to cost the player something or it is just
+    // flavour text — this is the case where Corporal Vance walked over and did nothing.
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 10, 5);
+    trooper.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'vigil' };
+
+    expect(resolveInvestigation(trooper)).toBe(true);
+    expect(trooper.provokedBy).toContain('player');
+    expect(trooper.investigating ?? null).toBeNull();
+  });
+
+  it('but not when the victim was their enemy anyway', () => {
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 10, 5);
+    trooper.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'wake' };
+
+    expect(resolveInvestigation(trooper)).toBe(false);
+    expect(trooper.provokedBy).toEqual([]);
+  });
+
+  it('and factions with no interest in order look, shrug, and carry on', () => {
+    const raider = createMonster(MONSTERS['wakeRaider']!, 10, 5);
+    raider.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'vigil' };
+
+    expect(resolveInvestigation(raider)).toBe(false);
+    expect(raider.provokedBy).toEqual([]);
+    expect(raider.investigating ?? null).toBeNull(); // curiosity satisfied either way
   });
 });

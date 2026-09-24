@@ -5,7 +5,7 @@ import type { GameState, RegionState } from '../engine/GameState';
 import { addMessage } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { chebyshevDistance, type Point } from '../utils/geometry';
-import { standingBetween, type FactionId } from '../world/Factions';
+import { FACTIONS, standingBetween, type FactionId } from '../world/Factions';
 import { ALERT_RADIUS, ALARM_RADIUS } from '../config/constants';
 
 /**
@@ -105,6 +105,9 @@ export function raiseAlarm(
   offender: FactionId,
   radius: number = ALARM_RADIUS,
 ): void {
+  // Carried with the errand so that whoever turns up knows what they're looking at. Deciding on
+  // arrival rather than from earshot is the difference between a witness and a telepath.
+  const context = { x: at.x, y: at.y, offender, victimFaction: screamerFaction };
   for (const listener of [...region.monsters, ...region.npcs]) {
     if (listener.hp <= 0) continue;
     if (listener.faction === offender) continue;
@@ -112,10 +115,10 @@ export function raiseAlarm(
 
     if (standingBetween(listener.faction, screamerFaction) === 'friendly') {
       provoke(listener, offender);
-      listener.investigating = { x: at.x, y: at.y };
+      listener.investigating = { ...context };
     } else if (!listener.investigating) {
       // Curious, not committed. They'll form an opinion when they get there.
-      listener.investigating = { x: at.x, y: at.y };
+      listener.investigating = { ...context };
     }
   }
 }
@@ -156,4 +159,36 @@ export function reactToAttack(
   if (chebyshevDistance(state.player, victim) <= ALARM_RADIUS) {
     addMessage(state, `${actorLabel(victim)} shouts for help.`.replace(/^./, (c) => c.toUpperCase()));
   }
+}
+
+/**
+ * What a witness makes of the scene once they reach it.
+ *
+ * Most people look, find nothing that concerns them, and go back to what they were doing. An
+ * order-keeping faction is different: someone they have no quarrel with was attacked in front of
+ * them, and dealing with that is the entire claim they make about themselves.
+ *
+ * Returns true if they took it up, so the caller can say so.
+ */
+export function resolveInvestigation(actor: Provokable): boolean {
+  const scene = actor.investigating;
+  actor.investigating = null;
+  if (!scene?.offender || !scene.victimFaction) return false;
+
+  if (!FACTIONS[actor.faction]?.keepsOrder) return false;
+  // Not a crime if the victim was already an enemy, and not their business if the culprit is a friend.
+  if (standingBetween(actor.faction, scene.victimFaction) === 'hostile') return false;
+  if (standingBetween(actor.faction, scene.offender) === 'friendly') return false;
+
+  return provoke(actor, scene.offender);
+}
+
+/** A noise worth walking to, and enough context to judge it on arrival. */
+export interface Investigation {
+  x: number;
+  y: number;
+  /** Whose fault it was. */
+  offender: FactionId;
+  /** Who was on the receiving end. */
+  victimFaction: FactionId;
 }
