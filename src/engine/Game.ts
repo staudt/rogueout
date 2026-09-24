@@ -1,8 +1,10 @@
 import { createPlayer, recomputePlayerCombatStats } from '../entities/Player';
 import { createRNG } from '../utils/RNG';
 import { chebyshevDistance, directionBetween, DIRECTION_VECTORS, type Point } from '../utils/geometry';
+import { joinWithAnd, withArticle } from '../utils/text';
 import { createItem } from '../items/Item';
 import { ITEMS } from '../items/ItemData';
+import { MONSTERS } from '../entities/MonsterData';
 import { addItem, consumeOne, removeItem } from '../items/Inventory';
 import { SHOPS } from '../world/ShopData';
 import type { Npc } from '../entities/Npc';
@@ -294,7 +296,7 @@ export class Game {
     }
 
     const regionIdBefore = this.state.activeRegionId;
-    const visibleEntitiesBefore = this.visibleEntityIds(region);
+    const visibleBefore = this.visibleEntities(region);
     const hpBefore = player.hp;
 
     const moved = this.turnManager.tryMovePlayer(direction);
@@ -314,12 +316,19 @@ export class Game {
     }
 
     const regionAfter = getActiveRegion(this.state);
-    const visibleEntitiesAfter = this.visibleEntityIds(regionAfter);
-    const newEntityAppeared = [...visibleEntitiesAfter].some((id) => !visibleEntitiesBefore.has(id));
+    const visibleAfter = this.visibleEntities(regionAfter);
+    const appeared = [...visibleAfter].filter(([id]) => !visibleBefore.has(id)).map(([, name]) => name);
     const tookDamage = player.hp < hpBefore;
 
-    if (newEntityAppeared || tookDamage) {
-      if (this.autoTravel.isActive()) addMessage(this.state, 'You stop.');
+    if (appeared.length > 0 || tookDamage) {
+      if (this.autoTravel.isActive()) {
+        // Name what stopped you. A bare "You stop." leaves the player hunting the screen for the
+        // reason; when damage is what stopped you, the attack message above already said so.
+        addMessage(
+          this.state,
+          appeared.length > 0 ? `You see ${joinWithAnd(appeared)}. You stop.` : 'You stop.',
+        );
+      }
       this.render();
       this.autoTravel.cancel();
       return;
@@ -342,17 +351,24 @@ export class Game {
     }
   }
 
-  /** Ids of every monster/NPC currently visible — diffed before/after each travel step so a
-   * newly-sighted entity of *either* kind interrupts travel, not just monsters. */
-  private visibleEntityIds(region: RegionState): Set<string> {
-    const ids = new Set<string>();
+  /**
+   * Every monster/NPC currently visible, as id -> how to name it in a message. Diffed before and
+   * after each travel step so a newly-sighted entity of *either* kind interrupts travel, and so
+   * the interruption can say what it saw. Ids are prefixed `m:`/`n:` to keep the two id spaces
+   * from colliding.
+   */
+  private visibleEntities(region: RegionState): Map<string, string> {
+    const entities = new Map<string, string>();
     for (const m of region.monsters) {
-      if (m.hp > 0 && isVisible(region.visibility, m.x, m.y)) ids.add(`m:${m.id}`);
+      if (m.hp > 0 && isVisible(region.visibility, m.x, m.y)) {
+        entities.set(`m:${m.id}`, withArticle(MONSTERS[m.defId]?.name ?? 'creature'));
+      }
     }
     for (const n of region.npcs) {
-      if (isVisible(region.visibility, n.x, n.y)) ids.add(`n:${n.id}`);
+      // NPCs have proper names, so no article: "You see Old Maren.", not "a Old Maren".
+      if (isVisible(region.visibility, n.x, n.y)) entities.set(`n:${n.id}`, n.name);
     }
-    return ids;
+    return entities;
   }
 
   private cancelAutoTravel(): void {

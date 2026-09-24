@@ -16,16 +16,12 @@ import { ITEMS } from '../items/ItemData';
 import { runMonsterTurns } from '../ai/AIScheduler';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import type { RNG } from '../utils/RNG';
+import { withArticle } from '../utils/text';
 
 const TILE_ANNOUNCEMENTS: Partial<Record<string, string>> = {
   stairsDown: 'You see a staircase leading down here. Press > to descend.',
   stairsUp: 'You see a staircase leading up here. Press < to climb.',
 };
-
-function withArticle(name: string): string {
-  const article = 'aeiou'.includes(name.charAt(0).toLowerCase()) ? 'an' : 'a';
-  return `${article} ${name}`;
-}
 
 export class TurnManager {
   private readonly state: GameState;
