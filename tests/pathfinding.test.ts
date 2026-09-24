@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findPath } from '../src/pathfinding/BFS';
 import { walkableLineToward } from '../src/pathfinding/StraightLine';
-import { chebyshevDistance, linePoints, type Point } from '../src/utils/geometry';
+import { chebyshevDistance, type Point } from '../src/utils/geometry';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { isWalkable, type GameMapData } from '../src/world/GameMap';
 import type { RegionState } from '../src/engine/GameState';
