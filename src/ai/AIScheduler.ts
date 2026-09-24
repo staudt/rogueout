@@ -17,6 +17,7 @@ import {
 } from '../narrative/Narration';
 import { areHostile } from '../world/Factions';
 import { isVisible } from '../fov/VisibilityState';
+import { MAX_ACTIONS_PER_TURN, NORMAL_SPEED } from '../config/constants';
 
 const ALL_DIRECTIONS: readonly Direction[] = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'];
 
@@ -26,6 +27,8 @@ const ALL_DIRECTIONS: readonly Direction[] = ['N', 'S', 'E', 'W', 'NE', 'NW', 'S
  * A monster looks for the nearest thing its *faction* is hostile to — which may be the player or
  * may be another monster — within its awarenessRadius (a plain distance check, not FOV; see
  * MonsterData.ts), closes in, and attacks once adjacent. Otherwise it wanders.
+ *
+ * How *many* times it does that in one of your turns depends on its speed.
  *
  * That the player is just another candidate target is the whole point: two opposed groups on the
  * same map fight each other with nothing scripting it, whether or not the player is involved or
@@ -37,21 +40,38 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
   for (const monster of region.monsters) {
     if (monster.hp <= 0 || state.gameOver) continue;
 
-    const target = findTarget(monster, state, region);
-    if (!target) {
-      wander(monster, state, region, rng);
-      continue;
-    }
+    // Bank this turn's movement points and spend them. A creature at twice NORMAL_SPEED acts
+    // twice per player turn — closing two tiles while you close one, and landing two blows
+    // between yours. Leftover points carry over, so speed 18 alternates one action and two.
+    monster.energy += monster.speed;
 
-    if (chebyshevDistance(monster, target) === 1) {
-      if (target === state.player) attackPlayer(monster, state, rng);
-      else attackMonster(monster, target as Monster, state, region, rng);
-    } else {
-      moveToward(monster, target, state, region);
+    let actions = 0;
+    while (monster.energy >= NORMAL_SPEED && actions < MAX_ACTIONS_PER_TURN) {
+      monster.energy -= NORMAL_SPEED;
+      actions += 1;
+
+      if (monster.hp <= 0 || state.gameOver) break;
+      takeAction(monster, state, region, rng);
     }
   }
 
   region.monsters = region.monsters.filter((m) => m.hp > 0);
+}
+
+/** One action: close on the nearest hostile, hit it if adjacent, or mill about. */
+function takeAction(monster: Monster, state: GameState, region: RegionState, rng: RNG): void {
+  const target = findTarget(monster, state, region);
+  if (!target) {
+    wander(monster, state, region, rng);
+    return;
+  }
+
+  if (chebyshevDistance(monster, target) === 1) {
+    if (target === state.player) attackPlayer(monster, state, rng);
+    else attackMonster(monster, target as Monster, state, region, rng);
+  } else {
+    moveToward(monster, target, state, region);
+  }
 }
 
 /** The nearest hostile thing this monster can be bothered to notice, or null. */

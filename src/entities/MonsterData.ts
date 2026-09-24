@@ -18,6 +18,12 @@ export interface MonsterDef {
   tags: string[];
   resist?: Resistances;
   faction: FactionId;
+  /**
+   * Movement points banked per player turn; NORMAL_SPEED (12) is ordinary. Higher means extra
+   * actions — a creature at 24 moves twice while you move once, and hits you twice between your
+   * own swings. Omitted means normal.
+   */
+  speed?: number;
   behavior: MonsterBehavior;
   /** Simple distance-check "sight" radius for v1 AI (full FOV-based awareness is a roadmap item). */
   awarenessRadius: number;

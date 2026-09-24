@@ -2,6 +2,7 @@ import type { Entity } from './Entity';
 import type { Combatant } from '../combat/Combatant';
 import type { MonsterBehavior, MonsterDef } from './MonsterData';
 import type { FactionId } from '../world/Factions';
+import { NORMAL_SPEED } from '../config/constants';
 
 export interface Monster extends Entity, Combatant {
   readonly kind: 'monster';
@@ -9,6 +10,10 @@ export interface Monster extends Entity, Combatant {
   behavior: MonsterBehavior;
   awarenessRadius: number;
   faction: FactionId;
+  /** Movement points banked per player turn. See constants.NORMAL_SPEED. */
+  speed: number;
+  /** Unspent movement points, carried between turns — this is what makes speed 18 work. */
+  energy: number;
 }
 
 let nextInstanceId = 0;
@@ -47,5 +52,7 @@ export function createMonster(def: MonsterDef, x: number, y: number): Monster {
     behavior: def.behavior,
     awarenessRadius: def.awarenessRadius,
     faction: def.faction,
+    speed: def.speed ?? NORMAL_SPEED,
+    energy: 0,
   };
 }

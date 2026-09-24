@@ -43,9 +43,21 @@ The full design plan (decisions, algorithms, milestone breakdown) lives at
 
 ## Character System (v1)
 
-Fallout SPECIAL stats (Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck), **fixed preset** at creation — no allocation screen, no XP/leveling in v1 (see Roadmap). Combat is NetHack-style: one action per turn, roll to-hit vs AC, roll damage on hit — no action-point economy. See `src/combat/CombatFormulas.ts` for the concrete formulas (the plan sketched a separate `stats/DerivedStats.ts`; the formulas were small enough to live in one file) (kept intentionally simple and tunable via `src/config/constants.ts`).
+Fallout SPECIAL stats (Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck), **fixed preset** at creation — no allocation screen, no XP/leveling in v1 (see Roadmap). Combat is NetHack-style: roll to-hit vs AC, roll damage on hit. Creatures act on a **speed/energy economy** (see below), not one action each per turn. See `src/combat/CombatFormulas.ts` for the concrete formulas (the plan sketched a separate `stats/DerivedStats.ts`; the formulas were small enough to live in one file) (kept intentionally simple and tunable via `src/config/constants.ts`).
 
 Items (weapons/armor) have durability that decreases with use and breaks at 0. No repair mechanic yet.
+
+### Speed
+
+Creatures act on NetHack's model, not one-action-per-turn. Each banks its `speed` in movement
+points every player turn and spends `NORMAL_SPEED` (12) per action, so **speed 24 acts twice
+while you act once** — closing two tiles to your one, and landing two blows between your swings —
+and leftover points carry over, which is what makes fractional speeds work (18 alternates one
+action and two). A creature that closes the last tile *and* attacks in the same turn is the
+system working: it spent two actions. `MAX_ACTIONS_PER_TURN` bounds the loop so a silly speed
+value can't hang a turn. Lives in `AIScheduler.runMonsterTurns` plus `Monster.speed`/`energy`.
+
+The player is still one action per turn; player haste/slow would hang off the same mechanism.
 
 ### Damage types and creature tags
 
@@ -205,6 +217,8 @@ Rules worth knowing:
   - `Narration.ts`'s header now states the register as a rule, since it has been set twice: keep lines short, modern and concrete — **if a line would sit comfortably in a fantasy novel, it does not belong here.**
   - **The other half of "medieval" is content, not phrasing, and is still outstanding**: goblins, a rusty sword, a healing herb, "the wilds". Tone can only carry so much while the nouns are fantasy ones. The fiction rename remains the pending decision recorded under Agreed design direction.
   - Two tests asserted the old wording and were updated to assert *behaviour* instead — a miss is never phrased as a hit, a kill reads as a kill — rather than matching specific phrasings, and one was decoupled from how many entries a phrase table happens to hold.
+- **Speed (NetHack-style energy), to the user's spec**: "some creatures move two blocks when you move one, will attack right after you move next to them, and can hit you multiple times between our attacks". Implemented as banked movement points (see Character System above) rather than a simple "acts twice" flag, because the user explicitly wanted fractional speeds to work like NetHack's.
+  - Verified by `tests/speed.test.ts` (ordinary closes one tile, double closes two, 1.5x alternates [1,2,1,2] via carried-over points, a fast neighbour lands exactly two blows in one of your turns, slow creatures bank until they can afford an action, and the whole thing is bounded) — 191 tests — plus a browser run where a speed-24 hunter and a speed-12 hunter started 12 tiles out: the fast one closed 2 tiles per turn, and on arrival stepped *and* attacked in the same turn.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).

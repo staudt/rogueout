@@ -20,3 +20,15 @@ export const AUTO_TRAVEL_STEP_MS = 90;
  * is behind it exactly as a dungeon wall does.
  */
 export const DAYLIGHT_SIGHT_RADIUS = 60;
+
+/**
+ * The cost of one action, and therefore the speed of an ordinary creature.
+ *
+ * NetHack's model: each creature banks its `speed` in movement points every player turn and
+ * spends NORMAL_SPEED per action, so speed 24 acts twice per turn and speed 18 alternates between
+ * one and two. The leftover carries over, which is what makes fractional speeds work.
+ */
+export const NORMAL_SPEED = 12;
+
+/** A hard stop on actions per creature per turn, so a silly speed value can't hang the game. */
+export const MAX_ACTIONS_PER_TURN = 8;
