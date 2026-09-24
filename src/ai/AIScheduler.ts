@@ -126,7 +126,7 @@ function attackPlayer(monster: Monster, state: GameState, rng: RNG): void {
   if (result.hit && !result.shrugged) {
     const damaged = damageEquippedArmor(player.equipment, player.inventory);
     if (damaged?.broke) {
-      addMessage(state, `Your ${damaged.itemName} shatters, useless.`);
+      addMessage(state, `Your ${damaged.itemName} breaks.`);
       recomputePlayerCombatStats(player);
     }
   }

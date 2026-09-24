@@ -59,7 +59,7 @@ export const REGIONS: Record<string, RegionDef> = {
     id: 'overworld',
     name: 'the wilds',
     daylight: true,
-    arrival: 'You climb back into the open air. The wilds stretch away around you.',
+    arrival: 'You come up into the open. Sand in every direction.',
     createState: () => {
       // The map arrives with its procedural POIs already decided (see maps/overworld.ts); all
       // this does is turn each one into the concrete monsters/items it described.
@@ -100,7 +100,7 @@ export const REGIONS: Record<string, RegionDef> = {
   'dungeon-1': {
     id: 'dungeon-1',
     name: 'the dungeon, level 1',
-    arrival: 'The stair ends in cold, close dark. Something moved, further in.',
+    arrival: 'The stairs end in the dark. Something moves, further in.',
     createState: () => {
       const monsters: Monster[] = [];
       const rat = MONSTERS['rat'];
@@ -133,7 +133,7 @@ export const REGIONS: Record<string, RegionDef> = {
   'dungeon-2': {
     id: 'dungeon-2',
     name: 'the dungeon, level 2',
-    arrival: 'Deeper still. The air here is older, and it does not stir.',
+    arrival: 'Deeper. The air down here is dead still.',
     createState: () => {
       const monsters: Monster[] = [];
       const goblin = MONSTERS['goblin'];

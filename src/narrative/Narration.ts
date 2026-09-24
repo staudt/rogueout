@@ -1,5 +1,10 @@
 /**
- * Turns the outcome of a turn into a line of prose.
+ * Turns the outcome of a turn into a line of text.
+ *
+ * Register is **plain and clipped** — "You hit the raider hard.", not "You land a savage blow".
+ * An earlier version of this file was written in a more literary voice and read as medieval,
+ * which is wrong for the setting. Keep new lines short, modern and concrete; if a line would sit
+ * comfortably in a fantasy novel, it does not belong here.
  *
  * The log used to report mechanics ("You hit the rat for 3."). It now describes what happened,
  * with the damage number replaced by *how hard* the blow landed, measured against what the target
@@ -34,86 +39,69 @@ export const UNARMED_VERB = 'strike';
 
 const PLAYER_HIT: Record<Severity, readonly string[]> = {
   graze: [
-    'You {verb} at the {target}, barely connecting.',
-    'Your blow only grazes the {target}.',
-    'You catch the {target} a glancing blow.',
-    'You scrape the {target}, no more than that.',
-    'The {target} takes the blow and barely notices.',
+    'You graze the {target}.',
+    'You clip the {target}.',
+    'You catch the {target}, barely.',
+    'You scrape the {target}.',
   ],
   solid: [
     'You {verb} the {target}.',
-    'You {verb} the {target} squarely.',
-    'Your blow lands clean on the {target}.',
-    'You get through the {target}\'s guard.',
-    'You {verb} the {target}, and it gives ground.',
+    'You hit the {target}.',
+    'You {verb} the {target} solidly.',
+    'You land a hit on the {target}.',
   ],
   heavy: [
     'You {verb} the {target} hard.',
-    'You land a savage blow on the {target}.',
-    'You {verb} the {target} with everything you have.',
-    'You put your weight behind it and the {target} reels.',
-    'You {verb} the {target} hard enough to stagger it.',
+    'You hit the {target} hard.',
+    'You tear into the {target}.',
+    'You {verb} the {target} and it staggers.',
   ],
 };
 
 const PLAYER_MISS: readonly string[] = [
-  'You {verb} at the {target} and miss.',
-  'The {target} twists away from your blow.',
-  'Your blow goes wide of the {target}.',
-  'You misjudge it, and hit nothing but air.',
-  'The {target} is not where your blow lands.',
+  'You miss the {target}.',
+  'You swing at the {target} and miss.',
+  'The {target} dodges.',
+  'You miss.',
 ];
 
 /** The blow landed and the target didn't care — a spear against something with nothing to pierce. */
 const PLAYER_SHRUGGED: readonly string[] = [
-  'Your blow lands on the {target} and does nothing at all.',
-  'You {verb} the {target}. It might as well not have happened.',
-  'The {target} takes your blow without any sign of harm.',
+  'You hit the {target}. No effect.',
+  'Your hit does nothing to the {target}.',
+  'You {verb} the {target}. Nothing happens.',
 ];
 
 /** Only reachable with a weapon that can take a head off, against something that has one. */
 const PLAYER_DECAPITATION: readonly string[] = [
+  "You cut the {target}'s head off.",
   "You take the {target}'s head off.",
-  'One clean stroke, and the {target} is headless.',
-  "The {target}'s head comes away, and the rest follows.",
+  'You behead the {target}.',
 ];
 
 const PLAYER_KILL: readonly string[] = [
-  'You {verb} the {target} down. It does not get up.',
-  'Your blow puts an end to the {target}.',
-  'The {target} crumples and lies still.',
-  'The {target} sags, and the fight goes out of it for good.',
+  'You kill the {target}.',
+  'The {target} drops.',
+  'The {target} goes down.',
+  'You put the {target} down.',
 ];
 
 const MONSTER_HIT: Record<Severity, readonly string[]> = {
-  graze: [
-    'The {attacker} nicks you.',
-    'The {attacker} catches you a glancing blow.',
-    'The {attacker} scores a shallow hit.',
-  ],
-  solid: [
-    'The {attacker} hits you.',
-    'The {attacker} lands a solid blow.',
-    'The {attacker} gets past your guard.',
-  ],
-  heavy: [
-    'The {attacker} hits you hard.',
-    'The {attacker} tears into you.',
-    'The {attacker} hits you hard enough to stagger you.',
-  ],
+  graze: ['The {attacker} grazes you.', 'The {attacker} clips you.', 'The {attacker} catches you, barely.'],
+  solid: ['The {attacker} hits you.', 'The {attacker} connects.', 'The {attacker} lands a hit.'],
+  heavy: ['The {attacker} hits you hard.', 'The {attacker} slams into you.', 'The {attacker} tears into you.'],
 };
 
 const MONSTER_SHRUGGED: readonly string[] = [
-  'The {attacker} hits you, and you barely feel it.',
-  "The {attacker}'s attack lands and does nothing.",
+  'The {attacker} hits you. No effect.',
+  "The {attacker}'s hit does nothing.",
 ];
 
 const MONSTER_MISS: readonly string[] = [
-  'The {attacker} swings at you and misses.',
-  'You twist away from the {attacker}.',
-  "The {attacker}'s attack glances off you.",
-  'The {attacker} comes at you and finds nothing.',
-  'You give ground, and the {attacker} misses.',
+  'The {attacker} misses you.',
+  'The {attacker} swings and misses.',
+  'You dodge the {attacker}.',
+  'The {attacker} misses.',
 ];
 
 export interface PlayerAttack {
@@ -174,15 +162,15 @@ export function narrateMonsterAttack(attack: MonsterAttack): string {
  */
 export function narrateCondition(hp: number, maxHp: number): string | null {
   if (hp <= 0 || maxHp <= 0) return null;
-  return hp / maxHp <= BADLY_HURT ? 'It looks badly hurt.' : null;
+  return hp / maxHp <= BADLY_HURT ? 'It is badly hurt.' : null;
 }
 
 /** Said once, as the player crosses into trouble — not repeated every turn after. */
-export const PLAYER_BADLY_HURT = 'You are bleeding badly.';
+export const PLAYER_BADLY_HURT = 'You are badly hurt.';
 
-export const PLAYER_DEATH = 'You fall, and do not rise again.';
+export const PLAYER_DEATH = 'You are dead.';
 
-const WAITING: readonly string[] = ['You wait, listening.', 'You hold still a moment.'];
+const WAITING: readonly string[] = ['You wait.', 'You hold still.'];
 
 export function narrateWaiting(seed: number): string {
   return pickPhrase(WAITING, seed);
@@ -207,22 +195,22 @@ function fill(template: string, values: Record<string, string>): string {
 }
 
 const BYSTANDER_HIT: readonly string[] = [
-  'The {attacker} lands a blow on the {target}.',
   'The {attacker} hits the {target}.',
-  'The {attacker} gets through the {target}\'s guard.',
+  'The {attacker} lands a hit on the {target}.',
+  'The {attacker} connects with the {target}.',
 ];
 
 const BYSTANDER_MISS: readonly string[] = [
-  'The {attacker} lunges at the {target} and misses.',
-  'The {target} slips away from the {attacker}.',
+  'The {attacker} misses the {target}.',
+  'The {attacker} swings at the {target} and misses.',
 ];
 
 const BYSTANDER_KILL: readonly string[] = [
-  'The {attacker} cuts the {target} down.',
-  'The {target} goes down under the {attacker}.',
+  'The {attacker} kills the {target}.',
+  'The {target} goes down.',
 ];
 
-const BYSTANDER_SHRUGGED: readonly string[] = ['The {attacker} hits the {target} to no effect.'];
+const BYSTANDER_SHRUGGED: readonly string[] = ['The {attacker} hits the {target}. No effect.'];
 
 export interface BystanderAttack {
   attacker: string;

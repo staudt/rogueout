@@ -27,8 +27,8 @@ import {
 } from '../narrative/Narration';
 
 const TILE_ANNOUNCEMENTS: Partial<Record<string, string>> = {
-  stairsDown: 'A staircase leads down into the dark here. Press > to descend.',
-  stairsUp: 'A staircase climbs back up here. Press < to take it.',
+  stairsDown: 'Stairs down. Press > to descend.',
+  stairsUp: 'Stairs up. Press < to climb.',
 };
 
 export class TurnManager {
@@ -182,7 +182,7 @@ export class TurnManager {
     if (ground) {
       const name = ITEMS[ground.item.defId]?.name ?? 'an item';
       const qty = ground.item.quantity > 1 ? `${ground.item.quantity} ${name}s` : withArticle(name);
-      addMessage(this.state, `${qty.charAt(0).toUpperCase()}${qty.slice(1)} lies here.`);
+      addMessage(this.state, `You see ${qty} here.`);
     }
 
     const announcement = TILE_ANNOUNCEMENTS[getTileId(region.map, x, y)];
@@ -228,7 +228,7 @@ export class TurnManager {
 
       const damaged = damageEquippedWeapon(this.state.player.equipment, this.state.player.inventory);
       if (damaged?.broke) {
-        addMessage(this.state, `Your ${damaged.itemName} shatters, useless.`);
+        addMessage(this.state, `Your ${damaged.itemName} breaks.`);
         recomputePlayerCombatStats(this.state.player);
       }
     }

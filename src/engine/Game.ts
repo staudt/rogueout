@@ -145,7 +145,7 @@ export class Game {
       gameOver: false,
     });
 
-    addMessage(this.state, 'Dawn, and the road east is waiting.');
+    addMessage(this.state, 'You set out. The road runs east.');
   }
 
   /** Points the game at a state — freshly made or freshly loaded — and rebuilds what hangs off it. */
@@ -517,7 +517,7 @@ export class Game {
     const region = getActiveRegion(this.state);
     const idx = region.groundItems.findIndex((g) => g.x === this.state.player.x && g.y === this.state.player.y);
     if (idx === -1) {
-      addMessage(this.state, 'There is nothing here worth taking.');
+      addMessage(this.state, 'There is nothing here to pick up.');
       this.render();
       return;
     }
@@ -526,7 +526,7 @@ export class Game {
     if (!ground) return;
     addItem(this.state.player.inventory, ground.item);
     const def = ITEMS[ground.item.defId];
-    addMessage(this.state, `You take the ${def?.name ?? 'item'}.`);
+    addMessage(this.state, `You pick up the ${def?.name ?? 'item'}.`);
 
     this.turnManager.advanceTurn();
     this.render();
@@ -635,7 +635,7 @@ export class Game {
 
     this.adoptState(loaded);
     this.screens.closeAll();
-    addMessage(this.state, 'You pick up the road where you left it.');
+    addMessage(this.state, 'You resume where you left off.');
     this.render();
   }
 
@@ -784,11 +784,11 @@ export class Game {
 
     if (action.kind === 'buy') {
       if (player.gold < action.price) {
-        addMessage(this.state, "You don't have the coin for that.");
+        addMessage(this.state, "You can't afford that.");
       } else {
         player.gold -= action.price;
         addItem(player.inventory, createItem(action.defId));
-        addMessage(this.state, `You hand over ${action.price} gold for the ${ITEMS[action.defId]?.name ?? 'item'}.`);
+        addMessage(this.state, `You buy the ${ITEMS[action.defId]?.name ?? 'item'} for ${action.price} gold.`);
       }
     } else {
       const item = player.inventory.find((i) => i.id === action.itemId);
@@ -798,7 +798,7 @@ export class Game {
         if (player.equipment.armor?.id === item.id) player.equipment.armor = null;
         removeItem(player.inventory, item.id);
         player.gold += action.price;
-        addMessage(this.state, `You part with the ${def.name} for ${action.price} gold.`);
+        addMessage(this.state, `You sell the ${def.name} for ${action.price} gold.`);
         recomputePlayerCombatStats(player);
       }
     }
@@ -819,10 +819,10 @@ export class Game {
 
     if (player.equipment[def.slot]?.id === item.id) {
       player.equipment[def.slot] = null;
-      addMessage(this.state, `You put the ${def.name} away.`);
+      addMessage(this.state, `You unequip the ${def.name}.`);
     } else {
       player.equipment[def.slot] = item;
-      addMessage(this.state, `You take up the ${def.name}.`);
+      addMessage(this.state, `You equip the ${def.name}.`);
     }
     recomputePlayerCombatStats(player);
 
@@ -842,7 +842,7 @@ export class Game {
 
     if (def.healAmount) {
       player.hp = Math.min(player.maxHp, player.hp + def.healAmount);
-      addMessage(this.state, `You use the ${def.name}, and the pain eases.`);
+      addMessage(this.state, `You use the ${def.name}. You recover ${def.healAmount} HP.`);
     }
     consumeOne(player.inventory, item.id);
 

@@ -40,7 +40,7 @@ describe('stairways need a deliberate >/<', () => {
     expect(state.activeRegionId).toBe('overworld');
     expect(state.player).toMatchObject(OVERWORLD_DUNGEON_ENTRANCE);
     expect(turnManager.stairwayUnderPlayer()).toBe('down');
-    expect(state.messageLog.join(' ')).toMatch(/staircase leads down/i);
+    expect(state.messageLog.join(' ')).toMatch(/stairs down/i);
   });
 
   it('> on the staircase crosses into the dungeon', () => {
