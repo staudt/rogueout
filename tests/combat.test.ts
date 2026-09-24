@@ -28,8 +28,9 @@ function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
     strength: 5,
     agility: 5,
     accuracyBonus: 0,
-    minDamage: 1,
-    maxDamage: 2,
+    damage: [{ type: 'bludgeon', min: 1, max: 2 }],
+    resistances: {},
+    tags: ['living'],
     ...overrides,
   };
 }
@@ -51,9 +52,9 @@ describe('CombatFormulas', () => {
     expect(computeToHitChance(1, 0, 50)).toBe(5); // would be deeply negative
   });
 
-  it('rollDamage never goes below 1 even against heavy resistance', () => {
+  it('rollDamage never goes below 1', () => {
     const rng = fakeRNG([0]); // lowest possible roll
-    expect(rollDamage(rng, 1, 2, 0, 100)).toBe(1);
+    expect(rollDamage(rng, 1, 2, 0)).toBe(1);
   });
 
   it('computeFovRadius scales with perception', () => {
@@ -90,7 +91,11 @@ describe('resolveMeleeAttack', () => {
   });
 
   it('never drops hp below 0', () => {
-    const attacker = makeCombatant({ agility: 20, strength: 20, minDamage: 50, maxDamage: 50 });
+    const attacker = makeCombatant({
+      agility: 20,
+      strength: 20,
+      damage: [{ type: 'bludgeon', min: 50, max: 50 }],
+    });
     const defender = makeCombatant({ ac: 0, hp: 3 });
     const rng = fakeRNG([0, 0]);
 

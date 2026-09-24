@@ -100,8 +100,11 @@ export const REGIONS: Record<string, RegionDef> = {
       const monsters: Monster[] = [];
       const rat = MONSTERS['rat'];
       const goblin = MONSTERS['goblin'];
+      const mold = MONSTERS['mold'];
       if (rat) monsters.push(createMonster(rat, 8, 3));
       if (goblin) monsters.push(createMonster(goblin, 11, 6));
+      // Immune to piercing and afraid of nothing you're carrying yet — the tag system, in person.
+      if (mold) monsters.push(createMonster(mold, 4, 2));
       return makeRegionState(createDungeonLevel1Map(), monsters, [{ item: createItem('rustySword'), x: 5, y: 6 }], []);
     },
     transitions: [

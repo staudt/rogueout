@@ -39,8 +39,9 @@ export function createMonster(def: MonsterDef, x: number, y: number): Monster {
     strength: def.strength,
     agility: def.agility,
     accuracyBonus: def.accuracyBonus,
-    minDamage: def.minDamage,
-    maxDamage: def.maxDamage,
+    damage: def.damage.map((packet) => ({ ...packet })), // copied: instances must not share the def's array
+    resistances: { ...(def.resist ?? {}) },
+    tags: [...def.tags],
     behavior: def.behavior,
     awarenessRadius: def.awarenessRadius,
   };

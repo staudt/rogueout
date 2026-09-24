@@ -2,6 +2,7 @@ import type { GameState } from '../../engine/GameState';
 import { ITEMS } from '../../items/ItemData';
 import type { Item } from '../../items/Item';
 import { computeCarryCapacity, computeFovRadius, computeToHitChance } from '../../combat/CombatFormulas';
+import type { DamagePacket, Resistances } from '../../combat/DamageTypes';
 import { REGIONS } from '../../world/regions/RegionRegistry';
 
 /** AC the displayed hit chance is quoted against — an unarmored, average-agility target. */
@@ -29,7 +30,7 @@ export function describeCharacter(state: GameState): string[] {
   const special = player.special;
 
   const derived = [
-    ['Damage', `${player.minDamage}-${player.maxDamage} +${Math.floor(special.strength / 3)} STR`],
+    ['Damage', describeDamage(player.damage, special.strength)],
     ['Hit vs AC' + REFERENCE_AC, `${computeToHitChance(special.agility, player.accuracyBonus, REFERENCE_AC)}%`],
     ['Sight', String(computeFovRadius(special.perception))],
     ['Carry', String(computeCarryCapacity(special.strength))],
@@ -50,7 +51,26 @@ export function describeCharacter(state: GameState): string[] {
   lines.push('', `Weapon: ${describeEquipped(player.equipment.weapon)}`);
   lines.push(`Armor:  ${describeEquipped(player.equipment.armor)}`);
 
+  const resisted = describeResistances(player.resistances);
+  if (resisted) lines.push(`Resists: ${resisted}`);
+
   return lines;
+}
+
+/** "2-4 cut +1 STR" — what the weapon does and what your arm adds to it. */
+function describeDamage(packets: readonly DamagePacket[], strength: number): string {
+  if (packets.length === 0) return 'none';
+  const parts = packets.map((packet) => `${packet.min}-${packet.max} ${packet.type}`);
+  const bonus = Math.floor(strength / 3);
+  return bonus > 0 ? `${parts.join(', ')} +${bonus} STR` : parts.join(', ');
+}
+
+/** Only the types you have an opinion about, as percentages; negatives read as vulnerabilities. */
+function describeResistances(resistances: Resistances): string | null {
+  const parts = (Object.entries(resistances) as Array<[string, number]>)
+    .filter(([, value]) => value !== 0)
+    .map(([type, value]) => `${type} ${value > 0 ? '' : '-'}${Math.round(Math.abs(value) * 100)}%`);
+  return parts.length > 0 ? parts.join('  ') : null;
 }
 
 function describeEquipped(item: Item | null): string {

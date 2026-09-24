@@ -47,6 +47,34 @@ Fallout SPECIAL stats (Strength, Perception, Endurance, Charisma, Intelligence, 
 
 Items (weapons/armor) have durability that decreases with use and breaks at 0. No repair mechanic yet.
 
+### Damage types and creature tags
+
+Combat is **typed**. A weapon deals one or more `DamagePacket`s (`{ type, min, max }`) and a
+defender carries `resistances` (a fraction per type: `0.5` halves, `1` is immunity, a *negative*
+is a vulnerability). See `src/combat/DamageTypes.ts`. Types: `cut | pierce | bludgeon | fire |
+cold | shock | acid | rad`; the first three are physical and are the only ones Strength adds to.
+
+Creatures carry **open-ended `tags`** — `'living'`, `'undead'`, `'head'`, `'arms'`, `'legs'`,
+`'mindless'`, `'amorphous'`, `'sentient'` — rather than a fixed anatomy schema (`hasHead`,
+`hasArms`, ...). That was a deliberate choice: a boolean-per-body-part list never stops growing
+and forces every system to ask about every field, whereas adding a concept to a tag system means
+adding a tag and a rule. Weapons carry `traits` in the same spirit (`'decapitates'`).
+
+The point is that behaviour **emerges from data meeting data**, with no special cases in the
+engine. The worked example is `crawling mold`: tagged `mindless` and `amorphous` with
+`{ pierce: 1, cut: 0.5, fire: -1 }`. A spear does *literally nothing* to it — there is nothing
+inside to puncture — a sword gets half through, and fire does double. Nothing anywhere mentions
+mold. Likewise decapitation is one rule: the weapon claims `'decapitates'`, the creature admits a
+`'head'`, the killing blow was `cut`. Change any one and it's an ordinary kill.
+
+Rules worth knowing:
+- The Strength bonus lands on the **single largest physical component**, not on every component,
+  or a two-type weapon would collect it twice for being descriptive about itself.
+- A blow that gets through at all does **at least 1** (rounding can't make a real hit free), but a
+  fully resisted blow does **exactly 0** and reports `shrugged` — immunity has to mean immunity.
+- `AttackResult.type` is the component that did the most damage, so the log can describe the blow
+  by what actually hurt. Armour that turns cuts can flip which half of a katana is doing the work.
+
 ## Current Status
 
 - **M0 (scaffolding) complete.**
@@ -158,14 +186,51 @@ Items (weapons/armor) have durability that decreases with use and breaks at 0. N
   - The kill is **folded into the blow that caused it** rather than following as a second line — one action, one sentence. Weapons carry their own verb (`ItemDef.attackVerb`, `rustySword: 'slash'`), defaulting to `UNARMED_VERB`, so equipment shows up in the prose. Regions carry `RegionDef.arrival` ("The stair ends in cold, close dark. Something moved, further in.") instead of "You enter the dungeon, level 1." Both are content in the existing data tables, not engine logic.
   - Non-combat lines got a lighter pass (pickup, equip, use, shop, waiting, ground items, breakage, the opening line). **Left deliberately alone**: the travel-interrupt sighting message, which the user had specified word-for-word the round before, and system messages about saves and pathing, which should stay plain.
   - Verified by `tests/narration.test.ts` (severity tiers incl. divide-by-zero, no digits leaking into prose, no unfilled `{placeholders}` across 60 seeds and every branch, misses never reading as hits, consecutive seeds never repeating, rotation over negative/huge seeds) — 164 tests total — plus reading actual fights and a descent in a browser, which is what caught both defects above. Two existing tests asserted exact old wording and now assert behaviour instead (a regex for the staircase, and `narrateWaiting(0)` for the deterministic wait line).
+- **Typed damage, creature tags and resistances** — stage 1 of an agreed multi-stage combat/progression design (see Roadmap). `src/combat/DamageTypes.ts` plus data changes across `ItemData`/`MonsterData`; `Combatant` swapped `minDamage`/`maxDamage` for `damage: DamagePacket[]` and gained `resistances` and `tags`. Full model documented under Character System above.
+  - Content added to prove the system rather than to pad it: `scrapSpear` (pierce, cheaper damage but armour barely stops it), `leatherArmor` gaining `{ cut: 0.35, pierce: 0.1 }` — the user's own example, armour turns a cut far better than a thrust — and `crawling mold` in dungeon-1, which is immune to piercing, half-resists cuts and burns.
+  - `rollDamage` in `CombatFormulas` is kept but demoted: it's now the one place the raw min/max/Strength curve lives, useful for effects that bypass armour. Everything resistible goes through `rollTypedDamage`.
+  - Verified by `tests/damage-types.test.ts` (resistance maths incl. immunity and vulnerability, stacking hide + armour, Strength landing once, no Strength on energy damage, dominant-type selection flipping under armour, and the mold end-to-end) — 178 tests total — plus browser runs: 40 turns of spear on the mold left it at 10/10 with "Your blow lands on the crawling mold and does nothing at all", while a sword killed it; and all three decapitation permutations behaved (sword+head → beheading, spear+head → ordinary kill, sword+no head → ordinary kill).
+  - **Testing trap worth remembering**: a fake RNG that always returns `0.999999` *always misses*, because the first draw is the to-hit roll and `randomInt(1,100)` gives 100, over the 95% cap. Damage tests driven through `resolveMeleeAttack` need an RNG that rolls low once, then high.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).
 
+## Agreed design direction (discussed and signed off; build in this order)
+
+The world is moving toward **post-apocalyptic, Fallout-flavoured**. The fiction rename (goblins,
+rusty swords, "the wilds") is still pending and should be **one deliberate pass**, not a slow
+drift into a world containing both goblins and pipe revolvers.
+
+1. ~~**Damage types, tags, resistances**~~ — done, see Character System above.
+2. **Factions and disposition.** Critically: **standings are relations between factions, not a
+   creature's attitude toward the player.** This came out of the user wanting large open battles
+   ("a desert war you're just one part of"). With faction-vs-faction standings, a battle is pure
+   content placement — drop thirty raiders and thirty militia in a region with their factions at
+   war and let the AI run; nobody scripts a battle. With player-relative disposition it's
+   impossible without scripting. Cheap now, expensive to retrofit — do not shortcut this.
+   Ship hostile/indifferent first; **allies are their own piece of work** (follow-AI, targeting,
+   and they will absolutely park on the one-tile causeway).
+3. **Skills, use-based.** Gains flow to the used skill and partly to a parent (`melee`), so
+   cutting lifts piercing a little — the graph is a data table. Designed against grinding from
+   day one: gain scales with how dangerous the target was, diminishing returns as the skill rises,
+   and gains on *meaningful events* (a kill, a hit on something that could hurt you), never per
+   swing. SPECIAL stays innate and fixed; skills are learned and fluid — Fallout's split, kept clean.
+4. **Classes as starting kits, not cages.** A class sets opening SPECIAL tilt, starting skill
+   weights and gear; everything after is use-based. Elder Scrolls' model — identity without a cage.
+   Needs a character-creation screen, which `ScreenManager` already supports.
+5. **Firearms.** Deliberately last: the expensive part is ranged targeting (line of fire, target
+   selection), not the gun. Design intent is *unreliable, loud, ammo-starved* rather than weak —
+   improvised ammunition (teeth, salt), jams and misfires, noise that draws attention. Weak-and-safe
+   is just a worse sword; strong-and-risky is a decision. `f` is already stubbed.
+
+Also agreed: a **goal** is wanted (an Amulet-of-Yendor-style direction, not a plot) and quests
+should be **faction objectives, not authored narrative chains** — do a thing, standing shifts,
+different people shoot at you later. That keeps it non-linear, and lets the war and the goal be
+the same thing: everyone is fighting over what you came for.
+
 ## Roadmap (explicitly deferred, do not build unless asked)
 
-- Skills system and perks
-- XP/leveling and any character progression
+- Perks
 - Item repair mechanic
 - Multi-slot saves (v1 is single-slot autosave only)
 - More towns, dungeons, quests, factions

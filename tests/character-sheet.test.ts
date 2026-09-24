@@ -32,7 +32,7 @@ describe('character sheet', () => {
     const state = makeState();
     const text = describeCharacter(state).join('\n');
 
-    expect(text).toContain('Damage      1-2 +1 STR'); // unarmed, plus the Strength bonus
+    expect(text).toContain('Damage      1-2 bludgeon +1 STR'); // fists, plus the Strength bonus
     expect(text).toContain('Sight       7'); // 6 + floor(5/3)
     expect(text).toContain('Carry       100'); // 50 + 5*10
     expect(text).toMatch(/Hit vs AC10\s+\d+%/);
@@ -62,6 +62,6 @@ describe('character sheet', () => {
     const text = describeCharacter(state).join('\n');
     expect(text).toContain('Weapon: rusty sword (20/20)');
     expect(text).toContain('Armor:  (none)');
-    expect(text).toContain('Damage      2-4 +1 STR'); // the sword's range, not unarmed
+    expect(text).toContain('Damage      2-4 cut +1 STR'); // the sword's range and type, not fists
   });
 });

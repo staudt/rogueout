@@ -15,15 +15,13 @@ export function computeToHitChance(attackerAgility: number, accuracyBonus: numbe
   return Math.max(5, Math.min(95, raw));
 }
 
-export function rollDamage(
-  rng: RNG,
-  minDamage: number,
-  maxDamage: number,
-  attackerStrength: number,
-  damageResist: number = 0,
-): number {
-  const base = randomInt(rng, minDamage, maxDamage) + Math.floor(attackerStrength / 3) - damageResist;
-  return Math.max(1, base);
+/**
+ * Flat, untyped damage. Superseded by rollTypedDamage (see combat/DamageTypes.ts) for anything
+ * that can be resisted; kept because it's the one place the raw min/max/Strength curve is
+ * expressed, and it stays useful for effects that bypass armour entirely.
+ */
+export function rollDamage(rng: RNG, minDamage: number, maxDamage: number, attackerStrength: number): number {
+  return Math.max(1, randomInt(rng, minDamage, maxDamage) + Math.floor(attackerStrength / 3));
 }
 
 export function computeCarryCapacity(strength: number): number {

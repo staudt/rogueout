@@ -64,6 +64,20 @@ const PLAYER_MISS: readonly string[] = [
   'The {target} is not where your blow lands.',
 ];
 
+/** The blow landed and the target didn't care — a spear against something with nothing to pierce. */
+const PLAYER_SHRUGGED: readonly string[] = [
+  'Your blow lands on the {target} and does nothing at all.',
+  'You {verb} the {target}. It might as well not have happened.',
+  'The {target} takes your blow without any sign of harm.',
+];
+
+/** Only reachable with a weapon that can take a head off, against something that has one. */
+const PLAYER_DECAPITATION: readonly string[] = [
+  "You take the {target}'s head off.",
+  'One clean stroke, and the {target} is headless.',
+  "The {target}'s head comes away, and the rest follows.",
+];
+
 const PLAYER_KILL: readonly string[] = [
   'You {verb} the {target} down. It does not get up.',
   'Your blow puts an end to the {target}.',
@@ -89,6 +103,11 @@ const MONSTER_HIT: Record<Severity, readonly string[]> = {
   ],
 };
 
+const MONSTER_SHRUGGED: readonly string[] = [
+  'The {attacker} hits you, and you barely feel it.',
+  "The {attacker}'s attack lands and does nothing.",
+];
+
 const MONSTER_MISS: readonly string[] = [
   'The {attacker} swings at you and misses.',
   'You twist away from the {attacker}.',
@@ -105,12 +124,19 @@ export interface PlayerAttack {
   damage: number;
   targetMaxHp: number;
   killed: boolean;
+  /** Landed, but every component was resisted away. */
+  shrugged?: boolean;
+  /** A killing cut from a weapon that can take a head off, against something that has one. */
+  decapitated?: boolean;
   seed: number;
 }
 
 export function narratePlayerAttack(attack: PlayerAttack): string {
   const values = { target: attack.target, verb: attack.verb };
   if (!attack.hit) return fill(pickPhrase(PLAYER_MISS, attack.seed), values);
+  // Checked before the kill: a blow that did nothing cannot have killed anything.
+  if (attack.shrugged) return fill(pickPhrase(PLAYER_SHRUGGED, attack.seed), values);
+  if (attack.killed && attack.decapitated) return fill(pickPhrase(PLAYER_DECAPITATION, attack.seed), values);
   if (attack.killed) return fill(pickPhrase(PLAYER_KILL, attack.seed), values);
   return fill(pickPhrase(PLAYER_HIT[severityOf(attack.damage, attack.targetMaxHp)], attack.seed), values);
 }
@@ -120,6 +146,7 @@ export interface MonsterAttack {
   hit: boolean;
   damage: number;
   targetMaxHp: number;
+  shrugged?: boolean;
   seed: number;
 }
 
@@ -137,6 +164,7 @@ export function narrateMonsterAttack(attack: MonsterAttack): string {
   const values = { attacker: attack.attacker };
   const seed = attack.seed + MONSTER_PHRASE_OFFSET;
   if (!attack.hit) return fill(pickPhrase(MONSTER_MISS, seed), values);
+  if (attack.shrugged) return fill(pickPhrase(MONSTER_SHRUGGED, seed), values);
   return fill(pickPhrase(MONSTER_HIT[severityOf(attack.damage, attack.targetMaxHp)], seed), values);
 }
 

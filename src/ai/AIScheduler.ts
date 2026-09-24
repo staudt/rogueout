@@ -56,11 +56,12 @@ function attackPlayer(monster: Monster, state: GameState, rng: RNG): void {
       hit: result.hit,
       damage: result.damage,
       targetMaxHp: player.maxHp,
+      shrugged: result.shrugged,
       seed: state.turnCount,
     }),
   );
 
-  if (result.hit) {
+  if (result.hit && !result.shrugged) {
     const damaged = damageEquippedArmor(player.equipment, player.inventory);
     if (damaged?.broke) {
       addMessage(state, `Your ${damaged.itemName} shatters, useless.`);

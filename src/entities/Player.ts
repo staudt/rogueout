@@ -2,12 +2,16 @@ import type { Entity } from './Entity';
 import type { Combatant } from '../combat/Combatant';
 import { DEFAULT_SPECIAL, type SpecialStats } from '../stats/SpecialStats';
 import { computeAC, computeMaxHP } from '../combat/CombatFormulas';
+import { combineResistances, type DamagePacket } from '../combat/DamageTypes';
 import type { Inventory } from '../items/Inventory';
 import { createEmptyEquipment, type Equipment } from '../items/Equipment';
 import { ITEMS } from '../items/ItemData';
 
-export const UNARMED_MIN_DAMAGE = 1;
-export const UNARMED_MAX_DAMAGE = 2;
+/** Fists: a bludgeon, and a poor one. */
+export const UNARMED_DAMAGE: DamagePacket[] = [{ type: 'bludgeon', min: 1, max: 2 }];
+
+/** What the player is made of, in the same vocabulary as any other creature. */
+export const PLAYER_TAGS = ['living', 'humanoid', 'head', 'arms', 'legs', 'sentient'];
 
 export interface Player extends Entity, Combatant {
   readonly kind: 'player';
@@ -33,8 +37,9 @@ export function createPlayer(x: number, y: number, special: SpecialStats = DEFAU
     strength: special.strength,
     agility: special.agility,
     accuracyBonus: 0, // unarmed until something is wielded
-    minDamage: UNARMED_MIN_DAMAGE,
-    maxDamage: UNARMED_MAX_DAMAGE,
+    damage: UNARMED_DAMAGE.map((packet) => ({ ...packet })),
+    resistances: {},
+    tags: [...PLAYER_TAGS],
     inventory: [],
     equipment: createEmptyEquipment(),
     gold: 15,
@@ -48,6 +53,7 @@ export function recomputePlayerCombatStats(player: Player): void {
 
   player.ac = computeAC(player.special.agility, armorDef?.armorValue ?? 0);
   player.accuracyBonus = weaponDef?.accuracyBonus ?? 0;
-  player.minDamage = weaponDef?.minDamage ?? UNARMED_MIN_DAMAGE;
-  player.maxDamage = weaponDef?.maxDamage ?? UNARMED_MAX_DAMAGE;
+  player.damage = (weaponDef?.damage ?? UNARMED_DAMAGE).map((packet) => ({ ...packet }));
+  // Worn armour is the player's only source of resistance for now; innate ones would combine here.
+  player.resistances = combineResistances(armorDef?.resist);
 }

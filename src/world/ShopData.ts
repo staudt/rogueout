@@ -15,6 +15,7 @@ export const SHOPS: Record<string, ShopDef> = {
     name: 'General Store',
     stock: [
       { defId: 'rustySword', price: 12 },
+      { defId: 'scrapSpear', price: 14 },
       { defId: 'leatherArmor', price: 20 },
       { defId: 'healingHerb', price: 5 },
     ],

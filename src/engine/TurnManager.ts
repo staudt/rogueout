@@ -8,6 +8,7 @@ import { computeFOV } from '../fov/Shadowcasting';
 import { markVisible, resetVisible } from '../fov/VisibilityState';
 import { computeFovRadius } from '../combat/CombatFormulas';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
+import { hasTag } from '../combat/DamageTypes';
 import type { Monster } from '../entities/Monster';
 import { MONSTERS } from '../entities/MonsterData';
 import { recomputePlayerCombatStats } from '../entities/Player';
@@ -195,20 +196,30 @@ export class TurnManager {
 
     // The kill is folded into the blow that caused it, rather than following as a second line —
     // one action should read as one sentence.
+    const weaponDef = weapon ? ITEMS[weapon.defId] : undefined;
+    // Nothing here knows what a head is: the weapon claims it can take one, the creature says
+    // whether it has one, and the rule is just the two tags meeting.
+    const decapitated =
+      result.type === 'cut' &&
+      hasTag(weaponDef?.traits, 'decapitates') &&
+      hasTag(monster.tags, 'head');
+
     addMessage(
       this.state,
       narratePlayerAttack({
         target: def?.name ?? 'creature',
-        verb: (weapon ? ITEMS[weapon.defId]?.attackVerb : undefined) ?? UNARMED_VERB,
+        verb: weaponDef?.attackVerb ?? UNARMED_VERB,
         hit: result.hit,
         damage: result.damage,
         targetMaxHp: monster.maxHp,
         killed: monster.hp <= 0,
+        shrugged: result.shrugged,
+        decapitated,
         seed: this.state.turnCount,
       }),
     );
 
-    if (result.hit) {
+    if (result.hit && !result.shrugged) {
       const condition = narrateCondition(monster.hp, monster.maxHp);
       if (condition) addMessage(this.state, condition);
 
