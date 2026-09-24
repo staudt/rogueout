@@ -190,9 +190,7 @@ export class TurnManager {
 
     const ground = region.groundItems.find((g) => g.x === x && g.y === y);
     if (ground) {
-      const name = ITEMS[ground.item.defId]?.name ?? 'an item';
-      const qty = ground.item.quantity > 1 ? `${ground.item.quantity} ${name}s` : withArticle(name);
-      addMessage(this.state, `You see ${qty} here.`);
+      addMessage(this.state, `You see ${describeGroundItem(ground.item)} here.`);
     }
 
     const announcement = TILE_ANNOUNCEMENTS[getTileId(region.map, x, y)];
@@ -256,8 +254,16 @@ export class TurnManager {
     }
 
     if (defender.hp <= 0) {
-      if (defender.kind === 'monster') dropLoot(defender, region, this.rng);
+      dropLoot(defender, region, this.rng, this.state.player.faction);
       removeActor(region, defender);
     }
   }
+}
+
+/** "a rusty machete", "12 caps", "the corpse of Corporal Vance". */
+function describeGroundItem(item: { defId: string; quantity: number; corpse?: { name: string } }): string {
+  if (item.corpse) return `the corpse of ${item.corpse.name.replace(/^the /, '')}`;
+  const name = ITEMS[item.defId]?.name ?? 'an item';
+  if (item.quantity > 1) return `${item.quantity} ${name}`;
+  return withArticle(name);
 }

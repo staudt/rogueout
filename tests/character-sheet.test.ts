@@ -22,7 +22,7 @@ describe('character sheet', () => {
 
     expect(text).toContain('the desert — turn 12');
     expect(text).toContain('HP 25/25');
-    expect(text).toContain('Gold 15');
+    expect(text).toContain('Caps 15');
     for (const stat of ['STRENGTH', 'PERCEPTION', 'ENDURANCE', 'CHARISMA', 'INTELLIGENCE', 'AGILITY', 'LUCK']) {
       expect(text).toContain(stat);
     }

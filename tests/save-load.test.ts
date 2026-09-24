@@ -39,7 +39,7 @@ describe('save/load round trip', () => {
 
     turnManager.tryMovePlayer('E');
     turnManager.tryMovePlayer('E');
-    state.player.gold = 42;
+    state.player.caps = 42;
     state.player.hp = 17;
     state.player.inventory.push(createItem('machete'));
     addMessage(state, 'You do something memorable.');
@@ -51,7 +51,7 @@ describe('save/load round trip', () => {
     expect(loaded!.player.x).toBe(state.player.x);
     expect(loaded!.player.y).toBe(state.player.y);
     expect(loaded!.player.hp).toBe(17);
-    expect(loaded!.player.gold).toBe(42);
+    expect(loaded!.player.caps).toBe(42);
     expect(loaded!.player.inventory.map((i) => i.defId)).toEqual(['machete']);
     expect(loaded!.turnCount).toBe(state.turnCount);
     expect(loaded!.activeRegionId).toBe('overworld');
@@ -193,13 +193,13 @@ describe('the rename from roguelite to rogueout', () => {
     // Losing someone's in-progress run to a cosmetic rename would be exactly the failure the
     // permadeath save exists to prevent.
     const { state } = makeRun();
-    state.player.gold = 99;
+    state.player.caps = 99;
     window.localStorage.setItem(LEGACY_KEY, JSON.stringify(toSaveData(state)));
 
     const storage = createLocalStorageAdapter();
 
     expect(hasSave(storage)).toBe(true);
-    expect(loadGame(storage)!.player.gold).toBe(99);
+    expect(loadGame(storage)!.player.caps).toBe(99);
   });
 
   it('moves the run onto the new key on the next save, and leaves the old one behind', () => {

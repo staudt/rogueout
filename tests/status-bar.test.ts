@@ -24,7 +24,7 @@ describe('status bar', () => {
 
     expect(find(state, 'HP')?.value).toBe('25/25');
     expect(find(state, 'AC')?.value).toBe('12');
-    expect(find(state, 'Gold')?.value).toBe('15');
+    expect(find(state, 'Caps')?.value).toBe('15');
     expect(find(state, 'Turn')?.value).toBe('31');
     // The unlabelled field is where you are.
     expect(fields.find((f) => f.label === '')?.value).toBe('the desert');

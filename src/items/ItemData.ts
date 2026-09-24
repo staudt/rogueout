@@ -1,7 +1,7 @@
 import type { DamagePacket, Resistances } from '../combat/DamageTypes';
 
 export type ItemSlot = 'weapon' | 'armor';
-export type ItemCategory = 'weapon' | 'armor' | 'consumable';
+export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'currency' | 'corpse';
 
 export interface ItemDef {
   id: string;
@@ -135,6 +135,31 @@ export const ITEMS: Record<string, ItemDef> = {
     stackable: false,
     armorValue: 2,
     resist: { cut: 0.35, pierce: 0.1, bludgeon: 0.1 },
+  },
+
+  /** Currency. Picked up straight into your purse rather than your pack. */
+  caps: {
+    id: 'caps',
+    name: 'caps',
+    glyph: '$',
+    fg: '#d4af37',
+    category: 'currency',
+    value: 1,
+    stackable: true,
+  },
+
+  /**
+   * What's left. No use yet — eating is a roadmap item — but a body on the ground is evidence,
+   * and the people who knew them react to finding it.
+   */
+  corpse: {
+    id: 'corpse',
+    name: 'corpse',
+    glyph: '%',
+    fg: '#8a6a6a',
+    category: 'corpse',
+    value: 0,
+    stackable: false,
   },
 
   medPack: {

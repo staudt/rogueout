@@ -93,7 +93,7 @@ export function kickCreature(
 
   if (monster.hp <= 0) {
     addMessage(state, capitalized(`${label} goes down.`));
-    if (monster.kind === 'monster') dropLoot(monster, region, rng);
+    dropLoot(monster, region, rng, state.player.faction);
     removeActor(region, monster);
     return { tookTurn: true };
   }
@@ -113,7 +113,7 @@ export function kickCreature(
     addMessage(state, capitalized(`${label} slams into ${otherLabel}.`));
     if (knock.collidedWith.hp <= 0) {
       addMessage(state, capitalized(`${otherLabel} goes down.`));
-      if (knock.collidedWith.kind === 'monster') dropLoot(knock.collidedWith, region, rng);
+      dropLoot(knock.collidedWith, region, rng, state.player.faction);
       removeActor(region, knock.collidedWith);
     }
   } else if (knock.hitWall && knock.moved === 0) {
@@ -184,7 +184,7 @@ export function flingItem(
 
       if (occupant.hp <= 0) {
         addMessage(state, capitalized(`${label} goes down.`));
-        if (occupant.kind === 'monster') dropLoot(occupant, region, rng);
+        dropLoot(occupant, region, rng, state.player.faction);
         removeActor(region, occupant);
       }
 

@@ -77,3 +77,6 @@ export const ALARM_RADIUS = 14;
  * Order-keeping factions ignore this and answer anything they can hear.
  */
 export const WITNESS_RADIUS = 7;
+
+/** How close you have to be to recognise a body on the ground as somebody you knew. */
+export const CORPSE_NOTICE_RADIUS = 3;

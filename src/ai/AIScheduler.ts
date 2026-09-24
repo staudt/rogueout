@@ -18,7 +18,9 @@ import {
 import { areHostile } from '../world/Factions';
 import {
   actorLabel,
+  callOutEnemy,
   livingActors,
+  noticeCorpses,
   reactToAttack,
   removeActor,
   resolveInvestigation,
@@ -79,17 +81,28 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
 
 /** One action: close on the nearest hostile, hit it if adjacent, run from danger, or mill about. */
 function takeAction(actor: Provokable, state: GameState, region: RegionState, rng: RNG): void {
+  // A body on the ground is evidence, and it keeps: a killing done in private is still findable.
+  noticeCorpses(state, region, actor);
+
   const behavior = effectiveBehavior(actor);
 
   if (behavior === 'flee') {
     const threat = actor.provokedBy.length > 0 ? findTarget(actor, state, region) : nearestOther(actor, state, region);
-    if (threat) moveAwayFrom(actor, threat, state, region);
-    else wander(actor, state, region, rng);
+    if (threat) {
+      // Running and screaming: the scream is the useful half.
+      callOutEnemy(state, region, actor, threat.faction);
+      moveAwayFrom(actor, threat, state, region);
+    } else {
+      actor.calledOut = false;
+      wander(actor, state, region, rng);
+    }
     return;
   }
 
   const target = behavior === 'chase' ? findTarget(actor, state, region) : null;
   if (target) {
+    // Seeing the enemy is worth saying out loud — it's what pulls everyone else toward a fight.
+    callOutEnemy(state, region, actor, target.faction);
     // Whatever they came to look at, this is more pressing.
     actor.investigating = null;
     if (chebyshevDistance(actor, target) === 1) attackTarget(actor, target, state, region, rng);
@@ -111,6 +124,8 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
     // They may now have someone to deal with; the next action will find them.
   }
 
+  // Nothing in sight any more: they'll shout again next time something turns up.
+  actor.calledOut = false;
   wander(actor, state, region, rng);
 }
 
@@ -227,7 +242,7 @@ function attackTarget(
   }
 
   if (defender.hp <= 0) {
-    if (defender.kind === 'monster') dropLoot(defender, region, rng);
+    dropLoot(defender, region, rng, attacker.faction);
     removeActor(region, defender);
   }
 }

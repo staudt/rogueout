@@ -40,10 +40,15 @@ export interface Npc extends Entity, Combatant {
   investigating?: Investigation | null;
   /** Set once they've raised the alarm, so one incident doesn't produce a scream every turn. */
   hasScreamed?: boolean;
+  /** Set while shouting about an enemy they can see; cleared when they lose sight of one. */
+  calledOut?: boolean;
   speed: number;
   energy: number;
   weight: number;
   awarenessRadius: number;
+  /** What they're visibly carrying. Recorded so it drops when they die, rather than vanishing. */
+  weaponDefId?: string;
+  armorDefId?: string;
 }
 
 export interface NpcOptions {
@@ -52,6 +57,8 @@ export interface NpcOptions {
   faction?: FactionId;
   /** What they fight with (an ItemData id). Unarmed if omitted. */
   weapon?: string;
+  /** What they're wearing (an ItemData id). Drops on death; doesn't yet affect their defence. */
+  armor?: string;
   /** See Npc.timid. */
   timid?: boolean;
   /** How far they drift from home while going about their day. */
@@ -70,7 +77,7 @@ export function createNpc(
   dialogue: string,
   options: NpcOptions = {},
 ): Npc {
-  const { shopId, faction = 'restoration', weapon, timid, wanderRadius, hp = 10, ac = 11 } = options;
+  const { shopId, faction = 'restoration', weapon, armor, timid, wanderRadius, hp = 10, ac = 11 } = options;
   const weaponDef = weapon ? ITEMS[weapon] : undefined;
   const npc: Npc = {
     id,
@@ -103,6 +110,8 @@ export function createNpc(
     awarenessRadius: 7,
   };
   if (shopId) npc.shopId = shopId;
+  if (weapon) npc.weaponDefId = weapon;
+  if (armor) npc.armorDefId = armor;
   if (timid) npc.timid = true;
   if (wanderRadius !== undefined) npc.wanderRadius = wanderRadius;
   return npc;

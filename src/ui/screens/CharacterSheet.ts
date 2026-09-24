@@ -39,7 +39,7 @@ export function describeCharacter(state: GameState): string[] {
   const lines = [
     `${REGIONS[state.activeRegionId]?.name ?? state.activeRegionId} — turn ${state.turnCount}`,
     '',
-    `HP ${player.hp}/${player.maxHp}    AC ${player.ac}    Gold ${player.gold}`,
+    `HP ${player.hp}/${player.maxHp}    AC ${player.ac}    Caps ${player.caps}`,
     '',
   ];
 

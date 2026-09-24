@@ -835,9 +835,20 @@ export class Game {
 
     const [ground] = region.groundItems.splice(idx, 1);
     if (!ground) return;
-    addItem(this.state.player.inventory, ground.item);
+
     const def = ITEMS[ground.item.defId];
-    addMessage(this.state, `You pick up the ${def?.name ?? 'item'}.`);
+    if (def?.category === 'currency') {
+      // Money goes in the purse, not the pack — carrying caps as an inventory line would be
+      // pure clutter, and the status bar already shows the total.
+      this.state.player.caps += ground.item.quantity;
+      addMessage(this.state, `You pick up ${ground.item.quantity} caps.`);
+    } else if (def?.category === 'corpse') {
+      addItem(this.state.player.inventory, ground.item);
+      addMessage(this.state, `You pick up ${ground.item.corpse?.name ?? 'a corpse'}.`);
+    } else {
+      addItem(this.state.player.inventory, ground.item);
+      addMessage(this.state, `You pick up the ${def?.name ?? 'item'}.`);
+    }
 
     this.turnManager.advanceTurn();
     this.render();
@@ -1120,7 +1131,7 @@ export class Game {
       lines: [
         '',
         `You survived ${this.state.turnCount} turns.`,
-        `Gold carried: ${player.gold}`,
+        `Caps carried: ${player.caps}`,
         `Fell in: ${REGIONS[this.state.activeRegionId]?.name ?? this.state.activeRegionId}`,
         '',
       ],
@@ -1156,7 +1167,7 @@ export class Game {
     }
 
     this.screens.push<ShopAction>({
-      title: `${shop.name} (Gold: ${this.state.player.gold})`,
+      title: `${shop.name} (Caps: ${this.state.player.caps})`,
       options,
       onSelect: (action) => this.handleShopAction(action),
     });
@@ -1166,12 +1177,12 @@ export class Game {
     const player = this.state.player;
 
     if (action.kind === 'buy') {
-      if (player.gold < action.price) {
+      if (player.caps < action.price) {
         addMessage(this.state, "You can't afford that.");
       } else {
-        player.gold -= action.price;
+        player.caps -= action.price;
         addItem(player.inventory, createItem(action.defId));
-        addMessage(this.state, `You buy the ${ITEMS[action.defId]?.name ?? 'item'} for ${action.price} gold.`);
+        addMessage(this.state, `You buy the ${ITEMS[action.defId]?.name ?? 'item'} for ${action.price} caps.`);
       }
     } else {
       const item = player.inventory.find((i) => i.id === action.itemId);
@@ -1180,8 +1191,8 @@ export class Game {
         if (player.equipment.weapon?.id === item.id) player.equipment.weapon = null;
         if (player.equipment.armor?.id === item.id) player.equipment.armor = null;
         removeItem(player.inventory, item.id);
-        player.gold += action.price;
-        addMessage(this.state, `You sell the ${def.name} for ${action.price} gold.`);
+        player.caps += action.price;
+        addMessage(this.state, `You sell the ${def.name} for ${action.price} caps.`);
         recomputePlayerCombatStats(player);
       }
     }

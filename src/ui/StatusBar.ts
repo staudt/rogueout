@@ -55,7 +55,7 @@ export function statusFields(state: GameState): Field[] {
   return [
     { label: 'HP', value: `${player.hp}/${player.maxHp}`, className: hurt ? 'status-danger' : undefined },
     { label: 'AC', value: String(player.ac) },
-    { label: 'Gold', value: String(player.gold) },
+    { label: 'Caps', value: String(player.caps) },
     { label: 'Weapon', value: describeEquipped(player.equipment.weapon) },
     { label: 'Armor', value: describeEquipped(player.equipment.armor) },
     { label: '', value: REGIONS[state.activeRegionId]?.name ?? state.activeRegionId },

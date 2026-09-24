@@ -6,6 +6,17 @@ export interface Item {
   quantity: number;
   /** Present only when the def has maxDurability (weapons/armor); absent for consumables. */
   durability?: number;
+  /** Set on a corpse: who it was, and who is to blame. Read by whoever finds the body. */
+  corpse?: CorpseInfo;
+}
+
+export interface CorpseInfo {
+  /** How the body reads in the log: "the corpse of Corporal Vance". */
+  name: string;
+  /** Whose side they were on — decides who takes finding them badly. */
+  faction: string;
+  /** Whose fault it was. */
+  killedBy: string;
 }
 
 /** An item instance sitting on the map, outside any inventory. */

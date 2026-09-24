@@ -29,6 +29,8 @@ export interface Monster extends Entity, Combatant {
   investigating?: Investigation | null;
   /** Set once it's raised the alarm, so one incident doesn't produce a shout every turn. */
   hasScreamed?: boolean;
+  /** Set while shouting about an enemy it can see; cleared when it loses sight of one. */
+  calledOut?: boolean;
 }
 
 let nextInstanceId = 0;

@@ -19,7 +19,7 @@ export interface Player extends Entity, Combatant {
   special: SpecialStats;
   inventory: Inventory;
   equipment: Equipment;
-  gold: number;
+  caps: number;
   faction: FactionId;
 }
 
@@ -44,7 +44,7 @@ export function createPlayer(x: number, y: number, special: SpecialStats = DEFAU
     tags: [...PLAYER_TAGS],
     inventory: [],
     equipment: createEmptyEquipment(),
-    gold: 15,
+    caps: 15,
     faction: PLAYER_FACTION,
   };
 }

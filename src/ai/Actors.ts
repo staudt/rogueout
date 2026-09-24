@@ -6,7 +6,8 @@ import { addMessage } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { chebyshevDistance, type Point } from '../utils/geometry';
 import { FACTIONS, standingBetween, type FactionId } from '../world/Factions';
-import { ALERT_RADIUS, ALARM_RADIUS, WITNESS_RADIUS } from '../config/constants';
+import { ALERT_RADIUS, ALARM_RADIUS, CORPSE_NOTICE_RADIUS, WITNESS_RADIUS } from '../config/constants';
+import { isVisible } from '../fov/VisibilityState';
 
 /**
  * Everything that can be hit, hunted, or take a turn — the player, creatures, and people.
@@ -204,4 +205,57 @@ export interface Investigation {
   offender: FactionId;
   /** Who was on the receiving end. */
   victimFaction: FactionId;
+}
+
+/**
+ * Coming across the body of someone whose side you were on.
+ *
+ * A killing done with nobody watching is still discoverable — the evidence lies where it fell.
+ * This is what stops "make sure there are no witnesses" being a complete answer, and it costs
+ * nothing to check, since a corpse only provokes people who weren't already angry.
+ */
+export function noticeCorpses(state: GameState, region: RegionState, finder: Provokable): boolean {
+  if (finder.provokedBy.length > 0) return false;
+
+  for (const ground of region.groundItems) {
+    const corpse = ground.item.corpse;
+    if (!corpse) continue;
+    if (chebyshevDistance(finder, ground) > CORPSE_NOTICE_RADIUS) continue;
+    if (standingBetween(finder.faction, corpse.faction) !== 'friendly') continue;
+    if (standingBetween(finder.faction, corpse.killedBy) === 'friendly') continue;
+
+    if (provoke(finder, corpse.killedBy)) {
+      alertAllies(region, finder, corpse.killedBy);
+      if (isVisible(region.visibility, finder.x, finder.y)) {
+        addMessage(state, `${actorLabel(finder)} finds ${corpse.name} dead.`.replace(/^./, (c) => c.toUpperCase()));
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Shouting that you've seen the enemy.
+ *
+ * The Wake are loud and the Restoration are drilled to call contact; either way the effect is the
+ * same and it's the point of the whole noise system — a fight anywhere pulls people toward it,
+ * so the world has weather rather than a set of unrelated encounters. Said once per sighting
+ * (`calledOut`), reset when they lose their target, or a standoff becomes a siren.
+ */
+export function callOutEnemy(
+  state: GameState,
+  region: RegionState,
+  spotter: Provokable,
+  enemyFaction: FactionId,
+): void {
+  if (spotter.calledOut || !canRaiseAlarm(spotter)) return;
+  spotter.calledOut = true;
+
+  raiseAlarm(region, spotter, spotter.faction, enemyFaction);
+
+  if (isVisible(region.visibility, spotter.x, spotter.y)) {
+    addMessage(state, `${actorLabel(spotter)} shouts a warning.`.replace(/^./, (c) => c.toUpperCase()));
+  }
 }

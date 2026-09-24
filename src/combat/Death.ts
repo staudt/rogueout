@@ -1,30 +1,62 @@
 import type { Combatant } from './Combatant';
-import type { Monster } from '../entities/Monster';
 import type { RegionState } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { createItem } from '../items/Item';
-import type { RNG } from '../utils/RNG';
+import { ITEMS } from '../items/ItemData';
+import { CORPSE_CHANCE, FACTION_LOOT, type LootEntry } from '../world/LootTables';
+import { actorLabel, type Provokable } from '../ai/Actors';
+import { randomInt, type RNG } from '../utils/RNG';
 
 export function isDead(combatant: Combatant): boolean {
   return combatant.hp <= 0;
 }
 
 /**
- * Leaves behind whatever the creature was carrying.
+ * Everything a body leaves behind: what they were holding, what their people carry, and — often
+ * enough — the body itself.
  *
- * Drops are per-creature data (`MonsterDef.drops`), so a raider can hand you the machete that
- * was just being used on you while a lizard leaves nothing. That's what makes fighting people
- * worth the risk, and it's the early game's only source of gear besides the shop.
- *
- * Items land on the creature's own tile; several drops stack on the same tile, which the ground
- * item list already allows.
+ * Gear they were actually using drops outright rather than on a roll. Being killed by someone
+ * holding a machete and finding no machete is the kind of small dishonesty that makes a world
+ * feel like a slot machine.
  */
-export function dropLoot(monster: Monster, region: RegionState, rng: RNG): void {
-  const drops = MONSTERS[monster.defId]?.drops;
-  if (!drops) return;
-
-  for (const drop of drops) {
-    if (rng() >= drop.chance) continue;
-    region.groundItems.push({ item: createItem(drop.defId), x: monster.x, y: monster.y });
+export function dropLoot(actor: Provokable, region: RegionState, rng: RNG, killedBy?: string): void {
+  for (const defId of carriedGear(actor)) {
+    region.groundItems.push({ item: createItem(defId), x: actor.x, y: actor.y });
   }
+
+  const table: LootEntry[] = [
+    ...(actor.kind === 'monster' ? (MONSTERS[actor.defId]?.drops ?? []) : []),
+    ...(FACTION_LOOT[actor.faction] ?? []),
+  ];
+
+  for (const entry of table) {
+    if (rng() >= entry.chance) continue;
+    const quantity = entry.quantity ? randomInt(rng, entry.quantity[0], entry.quantity[1]) : 1;
+    region.groundItems.push({ item: createItem(entry.defId, quantity), x: actor.x, y: actor.y });
+  }
+
+  if (killedBy && rng() < CORPSE_CHANCE) leaveCorpse(actor, region, killedBy);
+}
+
+/** What they were visibly using, which always drops. */
+function carriedGear(actor: Provokable): string[] {
+  const gear: string[] = [];
+  if (actor.kind === 'npc') {
+    if (actor.weaponDefId) gear.push(actor.weaponDefId);
+    if (actor.armorDefId) gear.push(actor.armorDefId);
+  }
+  return gear.filter((defId) => ITEMS[defId] !== undefined);
+}
+
+/**
+ * Leaves the body, tagged with who it was and whose fault it was.
+ *
+ * It has no use yet — eating is a roadmap item — but it isn't decoration either: their people
+ * react to finding it, which turns a killing done in private into something that can still be
+ * discovered later.
+ */
+function leaveCorpse(actor: Provokable, region: RegionState, killedBy: string): void {
+  const item = createItem('corpse');
+  item.corpse = { name: actorLabel(actor), faction: actor.faction, killedBy };
+  region.groundItems.push({ item, x: actor.x, y: actor.y });
 }
