@@ -9,13 +9,14 @@ import { markVisible, resetVisible } from '../fov/VisibilityState';
 import { computeFovRadius } from '../combat/CombatFormulas';
 import { DAYLIGHT_SIGHT_RADIUS } from '../config/constants';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
+import { dropLoot } from '../combat/Death';
 import { hasTag } from '../combat/DamageTypes';
 import type { Monster } from '../entities/Monster';
 import { MONSTERS } from '../entities/MonsterData';
 import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedWeapon } from '../items/Equipment';
 import { ITEMS } from '../items/ItemData';
-import { runMonsterTurns } from '../ai/AIScheduler';
+import { runMonsterTurns, runNpcTurns } from '../ai/AIScheduler';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import type { RNG } from '../utils/RNG';
 import { withArticle } from '../utils/text';
@@ -158,6 +159,7 @@ export class TurnManager {
     this.recomputeFOV();
     if (!this.state.gameOver) {
       runMonsterTurns(this.state, this.rng);
+      runNpcTurns(this.state, this.rng);
     }
     this.events.emit('turn-ended', { turnCount: this.state.turnCount });
   }
@@ -194,6 +196,11 @@ export class TurnManager {
   private attackMonster(monster: Monster): void {
     const region = getActiveRegion(this.state);
     const result = resolveMeleeAttack(this.rng, this.state.player, monster);
+
+    // Whatever it was doing before, it has a quarrel with you now.
+    if (!monster.provokedBy.includes(this.state.player.faction)) {
+      monster.provokedBy.push(this.state.player.faction);
+    }
     const def = MONSTERS[monster.defId];
     const weapon = this.state.player.equipment.weapon;
 
@@ -234,6 +241,7 @@ export class TurnManager {
     }
 
     if (monster.hp <= 0) {
+      dropLoot(monster, region, this.rng);
       region.monsters = region.monsters.filter((m) => m !== monster);
     }
   }

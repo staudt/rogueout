@@ -29,8 +29,8 @@ export interface Poi {
   guard?: { defId: string; x: number; y: number };
 }
 
-const RUIN_LOOT = ['rustySword', 'leatherArmor'];
-const CAMP_LOOT = ['healingHerb'];
+const RUIN_LOOT = ['machete', 'paddedVest', 'pipeWrench'];
+const CAMP_LOOT = ['medPack'];
 
 /** Half-width of a ruin's wall ring — 1 gives the 3x3 interior/5x5 footprint used below. */
 const RUIN_RADIUS = 2;
@@ -127,7 +127,7 @@ function carveRuin(map: GameMapData, center: Point, rng: RNG): Poi {
     x: center.x,
     y: center.y,
     loot,
-    guard: { defId: rng() < 0.5 ? 'goblin' : 'rat', x: guardSpot.x, y: guardSpot.y },
+    guard: { defId: rng() < 0.5 ? 'wakeRaider' : 'duneRunner', x: guardSpot.x, y: guardSpot.y },
   };
 }
 

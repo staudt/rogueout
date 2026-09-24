@@ -219,15 +219,44 @@ Rules worth knowing:
   - Two tests asserted the old wording and were updated to assert *behaviour* instead — a miss is never phrased as a hit, a kill reads as a kill — rather than matching specific phrasings, and one was decoupled from how many entries a phrase table happens to hold.
 - **Speed (NetHack-style energy), to the user's spec**: "some creatures move two blocks when you move one, will attack right after you move next to them, and can hit you multiple times between our attacks". Implemented as banked movement points (see Character System above) rather than a simple "acts twice" flag, because the user explicitly wanted fractional speeds to work like NetHack's.
   - Verified by `tests/speed.test.ts` (ordinary closes one tile, double closes two, 1.5x alternates [1,2,1,2] via carried-over points, a fast neighbour lands exactly two blows in one of your turns, slow creatures bank until they can afford an action, and the whole thing is bounded) — 191 tests — plus a browser run where a speed-24 hunter and a speed-12 hunter started 12 tiles out: the fast one closed 2 tiles per turn, and on arrival stepped *and* attacked in the same turn.
+- **The content pass: fiction rename, four factions, the early bestiary, weapons, drops, provocation, town life.** The user confirmed breaking saves was fine, so ids were renamed outright rather than aliased.
+  - **Every creature teaches one thing**, so `MonsterData` doubles as a difficulty curve: dust rat (free), sand skink (*not everything is a fight* — flees, and is fast enough to be hard to corner), pale scorpion (**carapace resists cut *and* pierce, vulnerable to bludgeon** — the first time your weapon choice is wrong), dune runner (a predator faster than you), feral ghoul (the mold's lesson at lethal difficulty: no vitals, so piercing barely works; weak to fire; speed 18; spawned in pairs), Wake raider and Restoration trooper (armed, armoured, **drop their gear**), crawling mold (speed 4 — a hazard you walk into rather than something that finds you).
+  - **Weapons now cover three damage types on purpose**: notched machete (cut, decapitates), scrap spear (pierce — beats the machete against armour), pipe wrench (bludgeon, -1 accuracy). The wrench exists *because* the scorpion exists; without it the carapace lesson has no answer. Verified in-browser: 3 damage through a carapace lands 1 as a cut and 3 as a bludgeon.
+  - **Drops** (`MonsterDef.drops`, `Death.dropLoot`) are the early game's only gear source besides the shop, and the reason fighting people is worth the risk. Animals drop nothing.
+  - **Provocation** is per-creature, not per-faction (`Monster.provokedBy`): hit a skink and *that* skink turns on you, while the next one still ignores you. Provoked creatures switch to `chase` regardless of their usual behaviour — a cornered animal fights. Without this, "neutral" reads as broken rather than peaceful.
+  - **`flee` behaviour** runs from the nearest creature of *another faction* — deliberately not the hostility check, since a skink has no enemies, it just doesn't want to be near you.
+  - **Town NPCs drift** within a `wanderRadius` of their `home` (`runNpcTurns`), so a settlement isn't a diorama. Shopkeepers get radius 0 — one who wanders off the counter is not a feature. The town now holds Maren (Reclamation, the shop), Sister Adel (Vigil) and Corporal Vance (Restoration), which puts three factions on screen before the player leaves.
+  - Region names followed the fiction: *the desert*, *the service tunnels*, *the deep levels*.
+  - **Still deferred, and worth knowing why**: thrown spears, molotovs and pipe bombs all need a targeting system (pick a tile, check line of fire), which is the same expensive part as firearms. They are the *ranged* milestone arriving early, not cheap additions to a melee pass. Molotovs are the most valuable of them — fire is what ghouls and mold are weak to, so they'd close a real loop.
+  - Verified by 7 new tests in `tests/factions.test.ts` (fleeing, provocation turning one animal without turning its species, drops landing on the body with real item ids, no drops on failed rolls, townsfolk drifting but never leaving their patch, shopkeepers staying put) — 198 tests — plus a browser run confirming all of the above in the live world.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).
 
-## Agreed design direction (discussed and signed off; build in this order)
+## The world
 
-The world is moving toward **post-apocalyptic, Fallout-flavoured**. The fiction rename (goblins,
-rusty swords, "the wilds") is still pending and should be **one deliberate pass**, not a slow
-drift into a world containing both goblins and pipe revolvers.
+Post-apocalyptic desert. Four human factions, settled with the user:
+
+- **The Restoration** — militia restoring order with military discipline, and fundamentally
+  corrupt. Holds the roads.
+- **The Wake** — accepts the world is over and is throwing it a funeral. Anarchic, hostile to
+  almost everyone.
+- **The Reclamation** — scavengers who believe anything made before the end is worth more than
+  anything made since. They trade. *Scrappers* is the street term for them.
+- **The Vigil** — a selfless order that finds water, purifies it and gives it away, and sits with
+  the dying. Friendly to the player, neutral with everyone, outmatched by all of it.
+
+The Restoration/Reclamation name collision is deliberate: two organisations with near-identical
+names and opposite values who dislike each other partly for the confusion. They are **neutral**,
+not hostile — open war would stop them ever sharing a settlement, and the starting town has both.
+The Wake/Vigil neutrality is also deliberate: the Vigil patches up anyone, raiders included, so
+the Wake leaves them alone.
+
+Plus ecology, which is not politics: **wildlife** (hostile to nobody — a creature that hunts
+belongs to **predators** instead, which is the entire difference between a skink and a dune
+runner) and **the feral** (ghouls, hostile to everything with a pulse).
+
+## Agreed design direction (discussed and signed off; build in this order)
 
 1. ~~**Damage types, tags, resistances**~~ — done, see Character System above.
 2. ~~**Factions and disposition**~~ — done, see the status entry. Still open from this stage:

@@ -20,7 +20,7 @@ function arena(width = 30, height = 7): RegionState {
 
 function chaseState(speed: number | undefined, startX: number): { state: GameState; hunter: ReturnType<typeof createMonster> } {
   const region = arena();
-  const def: MonsterDef = { ...MONSTERS['goblin']!, speed, awarenessRadius: 40 };
+  const def: MonsterDef = { ...MONSTERS['wakeRaider']!, speed, awarenessRadius: 40 };
   const hunter = createMonster(def, startX, 3);
   region.monsters.push(hunter);
 
@@ -74,7 +74,7 @@ describe('speed', () => {
   it('hits you more than once between your own swings', () => {
     // Stood next to a fast creature: your turn ends, and it gets two attacks before you act again.
     const region = arena();
-    const fast: MonsterDef = { ...MONSTERS['goblin']!, speed: NORMAL_SPEED * 2, awarenessRadius: 40, accuracyBonus: 500 };
+    const fast: MonsterDef = { ...MONSTERS['wakeRaider']!, speed: NORMAL_SPEED * 2, awarenessRadius: 40, accuracyBonus: 500 };
     region.monsters.push(createMonster(fast, 3, 3));
     const state: GameState = {
       player: createPlayer(2, 3),

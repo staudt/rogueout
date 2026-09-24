@@ -44,6 +44,12 @@ export interface RegionDef {
   transitions: RegionTransition[];
 }
 
+/** Marks an NPC as one who drifts around their patch rather than standing at a post. */
+function wanderer(npc: Npc, radius: number): Npc {
+  npc.wanderRadius = radius;
+  return npc;
+}
+
 function makeRegionState(
   map: GameMapData,
   monsters: Monster[] = [],
@@ -57,7 +63,7 @@ function makeRegionState(
 export const REGIONS: Record<string, RegionDef> = {
   overworld: {
     id: 'overworld',
-    name: 'the wilds',
+    name: 'the desert',
     daylight: true,
     arrival: 'You come up into the open. Sand in every direction.',
     createState: () => {
@@ -68,19 +74,48 @@ export const REGIONS: Record<string, RegionDef> = {
         map,
         poiGuards(pois),
         [
-          { item: createItem('healingHerb', 1), x: OVERWORLD_HERB_POS.x, y: OVERWORLD_HERB_POS.y },
+          { item: createItem('medPack', 1), x: OVERWORLD_HERB_POS.x, y: OVERWORLD_HERB_POS.y },
           ...poiLoot(pois),
         ],
         [
           createNpc(
             'shopkeeper',
-            'Old Maren',
+            'Maren of the Reclamation',
             '@',
-            '#ffcc66',
+            '#7fb3d5',
             OVERWORLD_SHOPKEEPER_POS.x,
             OVERWORLD_SHOPKEEPER_POS.y,
-            'Welcome, traveler. Take a look at my wares.',
-            'generalStore',
+            'Reclamation post. If it was made before, I will buy it.',
+            'reclamationPost',
+            'reclamation',
+          ),
+          wanderer(
+            createNpc(
+              'almoner',
+              'Sister Adel of the Vigil',
+              '@',
+              '#9fd3e0',
+              8,
+              12,
+              'There is water at the cistern, and no charge for it. Sit a while if you need to.',
+              undefined,
+              'vigil',
+            ),
+            4,
+          ),
+          wanderer(
+            createNpc(
+              'trooper',
+              'Corporal Vance',
+              '@',
+              '#c8b88a',
+              15,
+              17,
+              'Restoration holds this stretch of road. Keep your weapon down and we will have no trouble.',
+              undefined,
+              'restoration',
+            ),
+            5,
           ),
         ],
         true, // open sky
@@ -99,18 +134,18 @@ export const REGIONS: Record<string, RegionDef> = {
 
   'dungeon-1': {
     id: 'dungeon-1',
-    name: 'the dungeon, level 1',
+    name: 'the service tunnels',
     arrival: 'The stairs end in the dark. Something moves, further in.',
     createState: () => {
       const monsters: Monster[] = [];
-      const rat = MONSTERS['rat'];
-      const goblin = MONSTERS['goblin'];
-      const mold = MONSTERS['mold'];
-      if (rat) monsters.push(createMonster(rat, 8, 3));
-      if (goblin) monsters.push(createMonster(goblin, 11, 6));
-      // Immune to piercing and afraid of nothing you're carrying yet — the tag system, in person.
-      if (mold) monsters.push(createMonster(mold, 4, 2));
-      return makeRegionState(createDungeonLevel1Map(), monsters, [{ item: createItem('rustySword'), x: 5, y: 6 }], []);
+      const spawn = (id: string, x: number, y: number) => {
+        const def = MONSTERS[id];
+        if (def) monsters.push(createMonster(def, x, y));
+      };
+      spawn('dustRat', 8, 3);
+      spawn('paleScorpion', 11, 6); // your blades are the wrong tool for this one
+      spawn('crawlingMold', 4, 2);
+      return makeRegionState(createDungeonLevel1Map(), monsters, [{ item: createItem('machete'), x: 5, y: 6 }], []);
     },
     transitions: [
       {
@@ -132,16 +167,19 @@ export const REGIONS: Record<string, RegionDef> = {
 
   'dungeon-2': {
     id: 'dungeon-2',
-    name: 'the dungeon, level 2',
+    name: 'the deep levels',
     arrival: 'Deeper. The air down here is dead still.',
     createState: () => {
       const monsters: Monster[] = [];
-      const goblin = MONSTERS['goblin'];
-      if (goblin) monsters.push(createMonster(goblin, 9, 5));
+      const ghoul = MONSTERS['feralGhoul'];
+      if (ghoul) {
+        // They come in twos: fast enough that one is a fight and two is a problem.
+        monsters.push(createMonster(ghoul, 9, 5), createMonster(ghoul, 11, 3));
+      }
       return makeRegionState(
         createDungeonLevel2Map(),
         monsters,
-        [{ item: createItem('leatherArmor'), x: 12, y: 3 }],
+        [{ item: createItem('paddedVest'), x: 12, y: 3 }],
         [],
       );
     },

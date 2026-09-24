@@ -27,7 +27,7 @@ describe('status bar', () => {
     expect(find(state, 'Gold')?.value).toBe('15');
     expect(find(state, 'Turn')?.value).toBe('31');
     // The unlabelled field is where you are.
-    expect(fields.find((f) => f.label === '')?.value).toBe('the wilds');
+    expect(fields.find((f) => f.label === '')?.value).toBe('the desert');
   });
 
   it('flags low HP, and only when it is actually low', () => {
@@ -46,23 +46,23 @@ describe('status bar', () => {
     expect(find(state, 'Weapon')?.value).toBe('—');
     expect(find(state, 'Armor')?.value).toBe('—');
 
-    const sword = createItem('rustySword');
+    const sword = createItem('machete');
     sword.durability = 7;
     state.player.inventory.push(sword);
     state.player.equipment.weapon = sword;
     recomputePlayerCombatStats(state.player);
 
-    expect(find(state, 'Weapon')?.value).toBe('rusty sword 7/20');
+    expect(find(state, 'Weapon')?.value).toBe('notched machete 7/22');
   });
 
   it('tracks AC changing when armor goes on', () => {
     const state = makeState();
-    const armor = createItem('leatherArmor');
+    const armor = createItem('paddedVest');
     state.player.inventory.push(armor);
     state.player.equipment.armor = armor;
     recomputePlayerCombatStats(state.player);
 
     expect(find(state, 'AC')?.value).toBe('14'); // 10 + floor(5/2) + 2
-    expect(find(state, 'Armor')?.value).toBe('leather armor 15/15');
+    expect(find(state, 'Armor')?.value).toBe('padded vest 18/18');
   });
 });

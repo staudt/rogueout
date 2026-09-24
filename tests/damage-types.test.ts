@@ -121,7 +121,7 @@ describe('typed damage', () => {
 describe('the mold case, end to end', () => {
   // The reason tags exist: no special-casing anywhere, just tags and resistances meeting.
   const mold = () => {
-    const def = MONSTERS['mold']!;
+    const def = MONSTERS['crawlingMold']!;
     return combatant({
       hp: def.maxHp,
       maxHp: def.maxHp,
@@ -150,7 +150,7 @@ describe('the mold case, end to end', () => {
   });
 
   it('takes half from a sword, which at least has an edge', () => {
-    const sword = combatant({ agility: 20, strength: 0, damage: ITEMS['rustySword']!.damage! });
+    const sword = combatant({ agility: 20, strength: 0, damage: ITEMS['machete']!.damage! });
     const target = mold();
 
     const result = resolveMeleeAttack(hitHard(), sword, target);
@@ -167,10 +167,10 @@ describe('the mold case, end to end', () => {
 });
 
 describe('armour turns a cut better than a thrust', () => {
-  const armored = () => combatant({ ac: 0, resistances: ITEMS['leatherArmor']!.resist! });
+  const armored = () => combatant({ ac: 0, resistances: ITEMS['paddedVest']!.resist! });
 
   it('the sword loses more to armour than the spear does', () => {
-    const sword = combatant({ agility: 20, strength: 0, damage: ITEMS['rustySword']!.damage! });
+    const sword = combatant({ agility: 20, strength: 0, damage: ITEMS['machete']!.damage! });
     const spear = combatant({ agility: 20, strength: 0, damage: ITEMS['scrapSpear']!.damage! });
 
     const cut = resolveMeleeAttack(hitHard(), sword, armored());

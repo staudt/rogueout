@@ -30,21 +30,23 @@ export interface ItemDef {
 }
 
 export const ITEMS: Record<string, ItemDef> = {
-  rustySword: {
-    id: 'rustySword',
-    name: 'rusty sword',
+  machete: {
+    id: 'machete',
+    name: 'notched machete',
     glyph: ')',
     fg: '#c0c0c0',
     category: 'weapon',
     slot: 'weapon',
-    maxDurability: 20,
-    value: 12,
+    maxDurability: 22,
+    value: 14,
     stackable: false,
-    attackVerb: 'slash',
+    attackVerb: 'cut',
     accuracyBonus: 0,
     damage: [{ type: 'cut', min: 2, max: 4 }],
     traits: ['decapitates'],
   },
+
+  /** Armour turns a cut far better than a thrust, so this beats the machete against people. */
   scrapSpear: {
     id: 'scrapSpear',
     name: 'scrap spear',
@@ -53,35 +55,51 @@ export const ITEMS: Record<string, ItemDef> = {
     category: 'weapon',
     slot: 'weapon',
     maxDurability: 25,
-    value: 14,
+    value: 16,
     stackable: false,
     attackVerb: 'thrust',
     accuracyBonus: 1,
-    // Less raw damage than the sword, but piercing: armour and hide turn it far less.
     damage: [{ type: 'pierce', min: 2, max: 5 }],
   },
-  leatherArmor: {
-    id: 'leatherArmor',
-    name: 'leather armor',
+
+  /** The answer to a carapace, which turns blades and points alike. Clumsy against everything else. */
+  pipeWrench: {
+    id: 'pipeWrench',
+    name: 'pipe wrench',
+    glyph: ')',
+    fg: '#8a7f6a',
+    category: 'weapon',
+    slot: 'weapon',
+    maxDurability: 40,
+    value: 12,
+    stackable: false,
+    attackVerb: 'swing',
+    accuracyBonus: -1,
+    damage: [{ type: 'bludgeon', min: 2, max: 6 }],
+  },
+
+  paddedVest: {
+    id: 'paddedVest',
+    name: 'padded vest',
     glyph: '[',
     fg: '#8b5a2b',
     category: 'armor',
     slot: 'armor',
-    maxDurability: 15,
-    value: 20,
+    maxDurability: 18,
+    value: 22,
     stackable: false,
     armorValue: 2,
-    // The example that started this: armour turns a cut well and a thrust poorly.
     resist: { cut: 0.35, pierce: 0.1, bludgeon: 0.1 },
   },
-  healingHerb: {
-    id: 'healingHerb',
-    name: 'healing herb',
+
+  medPack: {
+    id: 'medPack',
+    name: 'med pack',
     glyph: '!',
     fg: '#ff4444',
     category: 'consumable',
-    value: 5,
+    value: 6,
     stackable: true,
-    healAmount: 5,
+    healAmount: 6,
   },
 };

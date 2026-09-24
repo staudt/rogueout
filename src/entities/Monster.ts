@@ -14,6 +14,12 @@ export interface Monster extends Entity, Combatant {
   speed: number;
   /** Unspent movement points, carried between turns — this is what makes speed 18 work. */
   energy: number;
+  /**
+   * Factions this individual has decided it has a quarrel with, regardless of what the standings
+   * table says. Hit a creature that was minding its own business and it stops minding it.
+   * Per-creature, not per-faction: spearing one lizard does not turn every lizard against you.
+   */
+  provokedBy: FactionId[];
 }
 
 let nextInstanceId = 0;
@@ -54,5 +60,6 @@ export function createMonster(def: MonsterDef, x: number, y: number): Monster {
     faction: def.faction,
     speed: def.speed ?? NORMAL_SPEED,
     energy: 0,
+    provokedBy: [],
   };
 }

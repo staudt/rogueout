@@ -41,7 +41,7 @@ describe('save/load round trip', () => {
     turnManager.tryMovePlayer('E');
     state.player.gold = 42;
     state.player.hp = 17;
-    state.player.inventory.push(createItem('rustySword'));
+    state.player.inventory.push(createItem('machete'));
     addMessage(state, 'You do something memorable.');
 
     expect(saveGame(storage, state)).toBe(true);
@@ -52,7 +52,7 @@ describe('save/load round trip', () => {
     expect(loaded!.player.y).toBe(state.player.y);
     expect(loaded!.player.hp).toBe(17);
     expect(loaded!.player.gold).toBe(42);
-    expect(loaded!.player.inventory.map((i) => i.defId)).toEqual(['rustySword']);
+    expect(loaded!.player.inventory.map((i) => i.defId)).toEqual(['machete']);
     expect(loaded!.turnCount).toBe(state.turnCount);
     expect(loaded!.activeRegionId).toBe('overworld');
     expect(loaded!.messageLog).toContain('You do something memorable.');
@@ -65,8 +65,8 @@ describe('save/load round trip', () => {
     turnManager.tryMovePlayer('E');
 
     const before = state.regions['overworld']!;
-    const goblin = MONSTERS['goblin']!;
-    before.monsters.push(createMonster(goblin, 30, 12));
+    const raider = MONSTERS['wakeRaider']!;
+    before.monsters.push(createMonster(raider, 30, 12));
 
     saveGame(storage, state);
     const after = loadGame(storage)!.regions['overworld']!;
@@ -78,7 +78,7 @@ describe('save/load round trip', () => {
     expect(isExplored(after.visibility, state.player.x, state.player.y)).toBe(true);
     expect(after.visibility.explored).toEqual(before.visibility.explored);
     expect(after.visibility.explored.some((seen) => !seen)).toBe(true); // something is still unseen
-    expect(after.monsters.map((m) => [m.defId, m.x, m.y])).toContainEqual(['goblin', 30, 12]);
+    expect(after.monsters.map((m) => [m.defId, m.x, m.y])).toContainEqual(['wakeRaider', 30, 12]);
     expect(after.groundItems.map((g) => g.item.defId)).toEqual(before.groundItems.map((g) => g.item.defId));
     expect(after.npcs.map((n) => n.id)).toEqual(before.npcs.map((n) => n.id));
   });
@@ -102,17 +102,17 @@ describe('save/load round trip', () => {
     // item could collide with a loaded one and inventory lookups (by id) would confuse the two.
     const storage = createMemoryStorage();
     const { state } = makeRun();
-    for (let i = 0; i < 5; i++) state.player.inventory.push(createItem('healingHerb'));
-    state.regions['overworld']!.monsters.push(createMonster(MONSTERS['rat']!, 25, 10));
+    for (let i = 0; i < 5; i++) state.player.inventory.push(createItem('medPack'));
+    state.regions['overworld']!.monsters.push(createMonster(MONSTERS['dustRat']!, 25, 10));
 
     saveGame(storage, state);
     const loaded = loadGame(storage)!;
 
     const loadedItemIds = new Set(loaded.player.inventory.map((i) => i.id));
-    expect(loadedItemIds.has(createItem('rustySword').id)).toBe(false);
+    expect(loadedItemIds.has(createItem('machete').id)).toBe(false);
 
     const loadedMonsterIds = new Set(loaded.regions['overworld']!.monsters.map((m) => m.id));
-    expect(loadedMonsterIds.has(createMonster(MONSTERS['rat']!, 1, 1).id)).toBe(false);
+    expect(loadedMonsterIds.has(createMonster(MONSTERS['dustRat']!, 1, 1).id)).toBe(false);
   });
 });
 

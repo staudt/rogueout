@@ -6,6 +6,7 @@ import { isWalkable } from '../world/GameMap';
 import type { Monster } from '../entities/Monster';
 import { MONSTERS } from '../entities/MonsterData';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
+import { dropLoot } from '../combat/Death';
 import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedArmor } from '../items/Equipment';
 import {
@@ -58,9 +59,19 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
   region.monsters = region.monsters.filter((m) => m.hp > 0);
 }
 
-/** One action: close on the nearest hostile, hit it if adjacent, or mill about. */
+/** One action: close on the nearest hostile, hit it if adjacent, run from danger, or mill about. */
 function takeAction(monster: Monster, state: GameState, region: RegionState, rng: RNG): void {
-  const target = findTarget(monster, state, region);
+  // Anything that's been hit stops running and stops grazing: a cornered animal fights.
+  const behavior = monster.provokedBy.length > 0 ? 'chase' : monster.behavior;
+
+  if (behavior === 'flee') {
+    const threat = nearestOther(monster, state, region);
+    if (threat) moveAwayFrom(monster, threat, state, region);
+    else wander(monster, state, region, rng);
+    return;
+  }
+
+  const target = behavior === 'chase' ? findTarget(monster, state, region) : null;
   if (!target) {
     wander(monster, state, region, rng);
     return;
@@ -74,17 +85,20 @@ function takeAction(monster: Monster, state: GameState, region: RegionState, rng
   }
 }
 
+/** Whether this creature has a quarrel with that one — by faction, or because it was hit. */
+function isEnemy(monster: Monster, faction: string): boolean {
+  return areHostile(monster.faction, faction) || monster.provokedBy.includes(faction);
+}
+
 /** The nearest hostile thing this monster can be bothered to notice, or null. */
 function findTarget(monster: Monster, state: GameState, region: RegionState): Point | null {
-  if (monster.behavior !== 'chase') return null;
-
   let best: Point | null = null;
   let bestDistance = monster.awarenessRadius;
 
   const candidates: Array<Point & { faction: string; hp: number }> = [state.player, ...region.monsters];
   for (const candidate of candidates) {
     if (candidate === monster || candidate.hp <= 0) continue;
-    if (!areHostile(monster.faction, candidate.faction)) continue;
+    if (!isEnemy(monster, candidate.faction)) continue;
 
     const distance = chebyshevDistance(monster, candidate);
     if (distance <= bestDistance) {
@@ -94,6 +108,35 @@ function findTarget(monster: Monster, state: GameState, region: RegionState): Po
   }
 
   return best;
+}
+
+/**
+ * The nearest thing that isn't one of its own — what a skittish animal runs from. Deliberately
+ * *not* the hostility check: a skink has no enemies, it just doesn't want to be near you.
+ */
+function nearestOther(monster: Monster, state: GameState, region: RegionState): Point | null {
+  let best: Point | null = null;
+  let bestDistance = monster.awarenessRadius;
+
+  const candidates: Array<Point & { faction: string; hp: number }> = [state.player, ...region.monsters];
+  for (const candidate of candidates) {
+    if (candidate === monster || candidate.hp <= 0) continue;
+    if (candidate.faction === monster.faction) continue;
+
+    const distance = chebyshevDistance(monster, candidate);
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+function moveAwayFrom(monster: Monster, threat: Point, state: GameState, region: RegionState): void {
+  const dx = Math.sign(monster.x - threat.x);
+  const dy = Math.sign(monster.y - threat.y);
+  tryMoveMonster(monster, { x: monster.x + dx, y: monster.y + dy }, state, region);
 }
 
 /**
@@ -108,6 +151,7 @@ function attackMonster(
   rng: RNG,
 ): void {
   const result = resolveMeleeAttack(rng, attacker, defender);
+  if (defender.hp <= 0) dropLoot(defender, region, rng);
   const seen =
     isVisible(region.visibility, attacker.x, attacker.y) || isVisible(region.visibility, defender.x, defender.y);
 
@@ -181,4 +225,31 @@ function tryMoveMonster(monster: Monster, target: Point, state: GameState, regio
 
   monster.x = target.x;
   monster.y = target.y;
+}
+
+/**
+ * Townsfolk going about their day. They aren't combatants — they drift around wherever they
+ * belong and get out of the way. Without this a settlement reads as a diorama: the difference
+ * between a town and a set is whether anyone in it moves.
+ */
+export function runNpcTurns(state: GameState, rng: RNG): void {
+  const region = getActiveRegion(state);
+
+  for (const npc of region.npcs) {
+    const radius = npc.wanderRadius ?? 0;
+    if (radius <= 0) continue;
+
+    const direction = ALL_DIRECTIONS[randomInt(rng, 0, ALL_DIRECTIONS.length - 1)] ?? 'N';
+    const target = addPoints(npc, DIRECTION_VECTORS[direction]);
+
+    const home = npc.home ?? npc;
+    if (chebyshevDistance(target, home) > radius) continue;
+    if (!isWalkable(region.map, target.x, target.y)) continue;
+    if (target.x === state.player.x && target.y === state.player.y) continue;
+    if (region.monsters.some((m) => m.hp > 0 && m.x === target.x && m.y === target.y)) continue;
+    if (region.npcs.some((other) => other !== npc && other.x === target.x && other.y === target.y)) continue;
+
+    npc.x = target.x;
+    npc.y = target.y;
+  }
 }

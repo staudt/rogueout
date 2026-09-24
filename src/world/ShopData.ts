@@ -10,14 +10,15 @@ export interface ShopDef {
 }
 
 export const SHOPS: Record<string, ShopDef> = {
-  generalStore: {
-    id: 'generalStore',
-    name: 'General Store',
+  reclamationPost: {
+    id: 'reclamationPost',
+    name: 'Reclamation Post',
     stock: [
-      { defId: 'rustySword', price: 12 },
-      { defId: 'scrapSpear', price: 14 },
-      { defId: 'leatherArmor', price: 20 },
-      { defId: 'healingHerb', price: 5 },
+      { defId: 'machete', price: 14 },
+      { defId: 'scrapSpear', price: 16 },
+      { defId: 'pipeWrench', price: 12 },
+      { defId: 'paddedVest', price: 22 },
+      { defId: 'medPack', price: 6 },
     ],
   },
 };

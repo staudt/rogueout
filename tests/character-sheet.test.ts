@@ -20,7 +20,7 @@ describe('character sheet', () => {
     const state = makeState();
     const text = describeCharacter(state).join('\n');
 
-    expect(text).toContain('the wilds — turn 12');
+    expect(text).toContain('the desert — turn 12');
     expect(text).toContain('HP 25/25');
     expect(text).toContain('Gold 15');
     for (const stat of ['STRENGTH', 'PERCEPTION', 'ENDURANCE', 'CHARISMA', 'INTELLIGENCE', 'AGILITY', 'LUCK']) {
@@ -54,13 +54,13 @@ describe('character sheet', () => {
     const state = makeState();
     expect(describeCharacter(state).join('\n')).toContain('Weapon: (none)');
 
-    const sword = createItem('rustySword');
+    const sword = createItem('machete');
     state.player.inventory.push(sword);
     state.player.equipment.weapon = sword;
     recomputePlayerCombatStats(state.player);
 
     const text = describeCharacter(state).join('\n');
-    expect(text).toContain('Weapon: rusty sword (20/20)');
+    expect(text).toContain('Weapon: notched machete (22/22)');
     expect(text).toContain('Armor:  (none)');
     expect(text).toContain('Damage      2-4 cut +1 STR'); // the sword's range and type, not fists
   });
