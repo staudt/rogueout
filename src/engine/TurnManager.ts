@@ -17,10 +17,16 @@ import { runMonsterTurns } from '../ai/AIScheduler';
 import { ensureRegionLoaded, REGIONS } from '../world/regions/RegionRegistry';
 import type { RNG } from '../utils/RNG';
 import { withArticle } from '../utils/text';
+import {
+  narrateCondition,
+  narratePlayerAttack,
+  narrateWaiting,
+  UNARMED_VERB,
+} from '../narrative/Narration';
 
 const TILE_ANNOUNCEMENTS: Partial<Record<string, string>> = {
-  stairsDown: 'You see a staircase leading down here. Press > to descend.',
-  stairsUp: 'You see a staircase leading up here. Press < to climb.',
+  stairsDown: 'A staircase leads down into the dark here. Press > to descend.',
+  stairsUp: 'A staircase climbs back up here. Press < to take it.',
 };
 
 export class TurnManager {
@@ -114,7 +120,7 @@ export class TurnManager {
   /** `.`: stand still, letting the world take its turn. */
   wait(): void {
     if (this.state.gameOver) return;
-    addMessage(this.state, 'You wait.');
+    addMessage(this.state, narrateWaiting(this.state.turnCount));
     this.advanceTurn();
   }
 
@@ -157,7 +163,8 @@ export class TurnManager {
     this.state.activeRegionId = toRegion;
     this.state.player.x = spawnX;
     this.state.player.y = spawnY;
-    addMessage(this.state, `You enter ${REGIONS[toRegion]?.name ?? toRegion}.`);
+    const def = REGIONS[toRegion];
+    addMessage(this.state, def?.arrival ?? `You enter ${def?.name ?? toRegion}.`);
     this.recomputeFOV();
     this.announceTileContents();
   }
@@ -171,7 +178,7 @@ export class TurnManager {
     if (ground) {
       const name = ITEMS[ground.item.defId]?.name ?? 'an item';
       const qty = ground.item.quantity > 1 ? `${ground.item.quantity} ${name}s` : withArticle(name);
-      addMessage(this.state, `You see here ${qty}.`);
+      addMessage(this.state, `${qty.charAt(0).toUpperCase()}${qty.slice(1)} lies here.`);
     }
 
     const announcement = TILE_ANNOUNCEMENTS[getTileId(region.map, x, y)];
@@ -183,20 +190,36 @@ export class TurnManager {
   private attackMonster(monster: Monster): void {
     const region = getActiveRegion(this.state);
     const result = resolveMeleeAttack(this.rng, this.state.player, monster);
-    const name = MONSTERS[monster.defId]?.name ?? 'creature';
+    const def = MONSTERS[monster.defId];
+    const weapon = this.state.player.equipment.weapon;
 
-    addMessage(this.state, result.hit ? `You hit the ${name} for ${result.damage}.` : `You miss the ${name}.`);
+    // The kill is folded into the blow that caused it, rather than following as a second line —
+    // one action should read as one sentence.
+    addMessage(
+      this.state,
+      narratePlayerAttack({
+        target: def?.name ?? 'creature',
+        verb: (weapon ? ITEMS[weapon.defId]?.attackVerb : undefined) ?? UNARMED_VERB,
+        hit: result.hit,
+        damage: result.damage,
+        targetMaxHp: monster.maxHp,
+        killed: monster.hp <= 0,
+        seed: this.state.turnCount,
+      }),
+    );
 
     if (result.hit) {
+      const condition = narrateCondition(monster.hp, monster.maxHp);
+      if (condition) addMessage(this.state, condition);
+
       const damaged = damageEquippedWeapon(this.state.player.equipment, this.state.player.inventory);
       if (damaged?.broke) {
-        addMessage(this.state, `Your ${damaged.itemName} breaks!`);
+        addMessage(this.state, `Your ${damaged.itemName} shatters, useless.`);
         recomputePlayerCombatStats(this.state.player);
       }
     }
 
     if (monster.hp <= 0) {
-      addMessage(this.state, `You kill the ${name}!`);
       region.monsters = region.monsters.filter((m) => m !== monster);
     }
   }

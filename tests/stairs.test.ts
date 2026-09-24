@@ -4,6 +4,7 @@ import { EventBus, type GameEvents } from '../src/engine/EventBus';
 import type { GameState, RegionState } from '../src/engine/GameState';
 import { createPlayer } from '../src/entities/Player';
 import { createRNG } from '../src/utils/RNG';
+import { narrateWaiting } from '../src/narrative/Narration';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { isWalkable } from '../src/world/GameMap';
 import { OVERWORLD_DUNGEON_ENTRANCE } from '../src/world/maps/overworld';
@@ -39,7 +40,7 @@ describe('stairways need a deliberate >/<', () => {
     expect(state.activeRegionId).toBe('overworld');
     expect(state.player).toMatchObject(OVERWORLD_DUNGEON_ENTRANCE);
     expect(turnManager.stairwayUnderPlayer()).toBe('down');
-    expect(state.messageLog.join(' ')).toContain('staircase leading down');
+    expect(state.messageLog.join(' ')).toMatch(/staircase leads down/i);
   });
 
   it('> on the staircase crosses into the dungeon', () => {
@@ -93,6 +94,7 @@ describe('waiting', () => {
     turnManager.wait();
 
     expect(state.turnCount).toBe(1);
-    expect(state.messageLog).toContain('You wait.');
+    // Phrasing varies, but deterministically: the seed is the turn the wait happened on.
+    expect(state.messageLog).toContain(narrateWaiting(0));
   });
 });

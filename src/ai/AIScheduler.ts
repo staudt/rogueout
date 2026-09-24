@@ -8,6 +8,12 @@ import { MONSTERS } from '../entities/MonsterData';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
 import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedArmor } from '../items/Equipment';
+import {
+  BADLY_HURT,
+  narrateMonsterAttack,
+  PLAYER_BADLY_HURT,
+  PLAYER_DEATH,
+} from '../narrative/Narration';
 
 const ALL_DIRECTIONS: readonly Direction[] = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'];
 
@@ -39,22 +45,38 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
 }
 
 function attackPlayer(monster: Monster, state: GameState, rng: RNG): void {
-  const result = resolveMeleeAttack(rng, monster, state.player);
-  const name = MONSTERS[monster.defId]?.name ?? 'creature';
+  const { player } = state;
+  const healthyBefore = player.hp > player.maxHp * BADLY_HURT;
+  const result = resolveMeleeAttack(rng, monster, player);
 
-  addMessage(state, result.hit ? `The ${name} hits you for ${result.damage}.` : `The ${name} misses you.`);
+  addMessage(
+    state,
+    narrateMonsterAttack({
+      attacker: MONSTERS[monster.defId]?.name ?? 'creature',
+      hit: result.hit,
+      damage: result.damage,
+      targetMaxHp: player.maxHp,
+      seed: state.turnCount,
+    }),
+  );
 
   if (result.hit) {
-    const damaged = damageEquippedArmor(state.player.equipment, state.player.inventory);
+    const damaged = damageEquippedArmor(player.equipment, player.inventory);
     if (damaged?.broke) {
-      addMessage(state, `Your ${damaged.itemName} breaks!`);
-      recomputePlayerCombatStats(state.player);
+      addMessage(state, `Your ${damaged.itemName} shatters, useless.`);
+      recomputePlayerCombatStats(player);
     }
   }
 
-  if (state.player.hp <= 0) {
+  if (player.hp <= 0) {
     state.gameOver = true;
-    addMessage(state, 'You die...');
+    addMessage(state, PLAYER_DEATH);
+    return;
+  }
+
+  // Said once, as you cross into trouble — repeating it every turn after would be noise.
+  if (healthyBefore && player.hp <= player.maxHp * BADLY_HURT) {
+    addMessage(state, PLAYER_BADLY_HURT);
   }
 }
 

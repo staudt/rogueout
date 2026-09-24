@@ -13,6 +13,8 @@ export interface ItemDef {
   value: number;
   stackable: boolean;
   // Weapon/armor combat fields (only relevant for their respective categories):
+  /** How this weapon reads in the log ("You slash the goblin"). Defaults to UNARMED_VERB. */
+  attackVerb?: string;
   accuracyBonus?: number;
   minDamage?: number;
   maxDamage?: number;
@@ -32,6 +34,7 @@ export const ITEMS: Record<string, ItemDef> = {
     maxDurability: 20,
     value: 12,
     stackable: false,
+    attackVerb: 'slash',
     accuracyBonus: 0,
     minDamage: 2,
     maxDamage: 4,

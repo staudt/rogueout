@@ -36,6 +36,8 @@ export interface RegionTransition {
 export interface RegionDef {
   id: string;
   name: string;
+  /** What it feels like to arrive here. Content, like everything else in this table. */
+  arrival?: string;
   createState: () => RegionState;
   transitions: RegionTransition[];
 }
@@ -53,6 +55,7 @@ export const REGIONS: Record<string, RegionDef> = {
   overworld: {
     id: 'overworld',
     name: 'the wilds',
+    arrival: 'You climb back into the open air. The wilds stretch away around you.',
     createState: () => {
       // The map arrives with its procedural POIs already decided (see maps/overworld.ts); all
       // this does is turn each one into the concrete monsters/items it described.
@@ -92,6 +95,7 @@ export const REGIONS: Record<string, RegionDef> = {
   'dungeon-1': {
     id: 'dungeon-1',
     name: 'the dungeon, level 1',
+    arrival: 'The stair ends in cold, close dark. Something moved, further in.',
     createState: () => {
       const monsters: Monster[] = [];
       const rat = MONSTERS['rat'];
@@ -121,6 +125,7 @@ export const REGIONS: Record<string, RegionDef> = {
   'dungeon-2': {
     id: 'dungeon-2',
     name: 'the dungeon, level 2',
+    arrival: 'Deeper still. The air here is older, and it does not stir.',
     createState: () => {
       const monsters: Monster[] = [];
       const goblin = MONSTERS['goblin'];
