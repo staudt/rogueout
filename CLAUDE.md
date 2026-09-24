@@ -277,6 +277,12 @@ Rules worth knowing:
   - **A nice thing that fell out rather than being written**: Sister Adel comes to look when you kick Corporal Vance, and then declines to turn on you — the Vigil are friendly to the player, and "none of their business if the culprit is a friend" covers it. The pacifist order doesn't side against you even watching you commit assault.
   - **Two false alarms while reproducing this, both my harness**: the first kick went into empty air because the target was *diagonally* adjacent and the script pressed one arrow (a diagonal needs both arrows chorded, exactly as when walking); and Vance genuinely does answer an attack on the Vigil, it just takes him ~10 turns to cross the street, which reads as "did nothing" if you stop waiting. Worth checking both before believing this system is broken.
   - Verified by 3 reworked/added tests in `tests/alarm.test.ts` — 253 total — and live: with Maren four tiles away, kicking Vance now has her hostile and swinging within three turns.
+- **The settled factions became a community, and the town got a population** (user: "Corporal Vance is the only exception that ignores and is ignored... sounds like he is in a different faction as the seller"). He was — and the asymmetry was real: the Reclamation and Vigil were friendly, and the Restoration was friendly with nobody, so Vance alone neither helped nor was helped. All four settled factions (Restoration, Reclamation, Vigil, and the new **settlers**) are now friendly with each other; the Restoration/Reclamation rivalry lives in their dialogue instead of the standings table.
+  - **The town now holds eleven people across four factions**, at the user's suggestion, because a settlement with three inhabitants can't show whether a *crowd* reacts to a crime — which is most of what the faction work was for. Each has a line that says what their faction is for.
+  - **Removed the "not their business if the culprit is a friend" exemption**, which existed only in `resolveInvestigation` and not in `alertAllies`/`raiseAlarm`. The same crowd therefore both condemned and forgave the player depending on which route the news travelled. Standing well with a faction is not a licence to beat their friends in front of them.
+  - Live results, which read the way a town should: kicking Corporal Vance turns **all eleven** hostile within a turn. Kicking a Wake raider in the same street turns **only the two Vigil** against you — the militia and the settlers are at war with the Wake and don't mind at all, while the pacifists object to violence full stop. Nobody wrote either outcome; both fall out of the table.
+  - **Consequence worth knowing, not yet addressed**: one assault makes an enemy of an entire settlement, permanently. That's faithful, and it's also unforgiving — there is no way to apologise, pay a fine, or have it blow over. Reputation decay (or the Restoration's "tithe" being collectable as a bribe, which their dialogue already hints at) is the natural next step.
+  - **Two measurement traps hit while verifying this**, both mine: a diagonal kick needs both arrows chorded or it hits empty air, and counting `provokedBy.length` counts townsfolk angry at *the raider* as well as at the player. The second one made it look as though the whole town objected to killing raiders.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).
@@ -286,19 +292,23 @@ See the plan file referenced above for the full milestone sequence (M0–M10).
 Post-apocalyptic desert. Four human factions, settled with the user:
 
 - **The Restoration** — militia restoring order with military discipline, and fundamentally
-  corrupt. Holds the roads.
+  corrupt. Holds the roads. The only faction that `keepsOrder`: answers trouble anywhere in
+  earshot instead of only what happens in front of it.
 - **The Wake** — accepts the world is over and is throwing it a funeral. Anarchic, hostile to
-  almost everyone.
+  almost everyone, and the one human faction the town is at war with.
 - **The Reclamation** — scavengers who believe anything made before the end is worth more than
-  anything made since. They trade. *Scrappers* is the street term for them.
+  anything made since. They trade — with anyone, the Wake included, which is why they aren't
+  hostile to them. *Scrappers* is the street term for them.
 - **The Vigil** — a selfless order that finds water, purifies it and gives it away, and sits with
-  the dying. Friendly to the player, neutral with everyone, outmatched by all of it.
+  the dying. Friendly to the player, and pacifist to the point of objecting when you beat a raider.
+- **The settled** — people who live here and belong to no organisation.
 
-The Restoration/Reclamation name collision is deliberate: two organisations with near-identical
-names and opposite values who dislike each other partly for the confusion. They are **neutral**,
-not hostile — open war would stop them ever sharing a settlement, and the starting town has both.
-The Wake/Vigil neutrality is also deliberate: the Vigil patches up anyone, raiders included, so
-the Wake leaves them alone.
+**The four settled factions are all friendly with each other.** The Restoration and the
+Reclamation still dislike each other, but that is **temperament, carried in what they say**, not
+enmity in the standings table. Modelling the rivalry as neutrality was tried and reverted: it made
+the Restoration the one faction that neither helped anyone nor was helped by anyone, which read
+exactly like the bug it wasn't — the user reported it twice. A town looks after its own; if that
+tension needs to become mechanical later, reputation is the place for it, not a permanent table.
 
 Plus ecology, which is not politics: **wildlife** (hostile to nobody — a creature that hunts
 belongs to **predators** instead, which is the entire difference between a skink and a dune

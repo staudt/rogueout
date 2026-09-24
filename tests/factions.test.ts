@@ -41,9 +41,8 @@ describe('standings are between factions, not toward the player', () => {
   });
 
   it('defaults to neutral for pairs nobody has an opinion about', () => {
-    // Deliberate: the Restoration and the Reclamation are cold rivals with confusingly similar
-    // names, not open enemies — open war would stop them ever sharing a settlement.
-    expect(standingBetween('restoration', 'reclamation')).toBe('neutral');
+    // The Wake has no opinion of the desert's wildlife, and vice versa.
+    expect(standingBetween('wake', 'wildlife')).toBe('neutral');
     expect(standingBetween('wake', 'reclamation')).toBe('neutral');
   });
 

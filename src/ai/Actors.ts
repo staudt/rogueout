@@ -172,9 +172,14 @@ export function reactToAttack(
  * What a witness makes of the scene once they reach it.
  *
  * Anyone who watched someone they had no quarrel with get beaten takes against whoever did it.
- * The exceptions are the honest ones: no crime if the victim was already their enemy, and none of
- * their business if the culprit is a friend. A Wake raider watching you kick a Restoration
- * trooper is, if anything, pleased.
+ * The one exception is the honest one: it isn't a crime if the victim was already their enemy — a
+ * Wake raider watching you kick a Restoration trooper is, if anything, pleased.
+ *
+ * Note there is deliberately **no exemption for being liked**. Standing well with someone is not a
+ * licence to beat their friends in front of them; the Vigil are fond of the player right up until
+ * they watch him kick a corporal. It also has to match what `alertAllies` and `raiseAlarm` do, and
+ * an exemption in only one of the three paths meant the same crowd both condemned and forgave you
+ * depending on which route the news took.
  *
  * Returns true if they took it up, so the caller can say so.
  */
@@ -187,7 +192,6 @@ export function resolveInvestigation(actor: Provokable): boolean {
   // beat a person you had no quarrel with — that's ordinary, and it's what makes a town feel like
   // it contains people rather than quest-givers.
   if (standingBetween(actor.faction, scene.victimFaction) === 'hostile') return false;
-  if (standingBetween(actor.faction, scene.offender) === 'friendly') return false;
 
   return provoke(actor, scene.offender);
 }

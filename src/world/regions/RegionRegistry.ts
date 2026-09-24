@@ -72,6 +72,9 @@ export const REGIONS: Record<string, RegionDef> = {
           ...poiLoot(pois),
         ],
         [
+          // The town: three organisations and the people who just live here. Deliberately more
+          // populous than the mechanics strictly need — a settlement with three inhabitants can't
+          // show whether a crowd reacts to a crime, which is most of what the faction work is for.
           createNpc(
             'shopkeeper',
             'Maren of the Reclamation',
@@ -82,6 +85,27 @@ export const REGIONS: Record<string, RegionDef> = {
             'Reclamation post. If it was made before, I will buy it.',
             { shopId: 'reclamationPost', faction: 'reclamation', weapon: 'pipeWrench', hp: 14 },
           ),
+          createNpc(
+            'scrapper-eli',
+            'Eli, sorting scrap',
+            '@',
+            '#7fb3d5',
+            9,
+            4,
+            'Maren pays by the kilo. Anything with a maker\'s mark, she pays double.',
+            { faction: 'reclamation', weapon: 'pipeWrench', wanderRadius: 3 },
+          ),
+          createNpc(
+            'scrapper-tova',
+            'Tova of the Reclamation',
+            '@',
+            '#7fb3d5',
+            17,
+            10,
+            'The Restoration call us looters. We call them tenants.',
+            { faction: 'reclamation', wanderRadius: 4 },
+          ),
+
           createNpc(
             'almoner',
             'Sister Adel of the Vigil',
@@ -94,6 +118,17 @@ export const REGIONS: Record<string, RegionDef> = {
             { faction: 'vigil', timid: true, wanderRadius: 4, hp: 8 },
           ),
           createNpc(
+            'waterbearer',
+            'Brother Cass of the Vigil',
+            '@',
+            '#9fd3e0',
+            5,
+            22,
+            'Two cups a day, and more for the children. Nobody is turned away.',
+            { faction: 'vigil', timid: true, wanderRadius: 5, hp: 8 },
+          ),
+
+          createNpc(
             'trooper',
             'Corporal Vance',
             '@',
@@ -102,6 +137,57 @@ export const REGIONS: Record<string, RegionDef> = {
             17,
             'Restoration holds this stretch of road. Keep your weapon down and we will have no trouble.',
             { faction: 'restoration', weapon: 'machete', wanderRadius: 5, hp: 16, ac: 13 },
+          ),
+          createNpc(
+            'trooper-2',
+            'Trooper Ike',
+            '@',
+            '#c8b88a',
+            13,
+            24,
+            'Corporal says the desert is ours. Corporal has not been out in it.',
+            { faction: 'restoration', weapon: 'machete', wanderRadius: 6, hp: 14, ac: 12 },
+          ),
+          createNpc(
+            'sergeant',
+            'Sergeant Okonkwo',
+            '@',
+            '#c8b88a',
+            18,
+            3,
+            'Tithe is collected on the fifth. Order costs, and somebody pays for it.',
+            { faction: 'restoration', weapon: 'machete', wanderRadius: 2, hp: 18, ac: 13 },
+          ),
+
+          createNpc(
+            'settler-hana',
+            'Hana, mending a roof',
+            '@',
+            '#bfae8a',
+            4,
+            8,
+            'We were here before any of their flags. We will be here after.',
+            { faction: 'settlers', wanderRadius: 3 },
+          ),
+          createNpc(
+            'settler-rook',
+            'Rook, boiling water',
+            '@',
+            '#bfae8a',
+            10,
+            20,
+            'You want the tunnels, go east. You want to come back, go with somebody.',
+            { faction: 'settlers', wanderRadius: 3 },
+          ),
+          createNpc(
+            'settler-child',
+            'a child, throwing stones',
+            '@',
+            '#bfae8a',
+            6,
+            19,
+            'Are you from out there? Did you see the lights?',
+            { faction: 'settlers', timid: true, wanderRadius: 6, hp: 5 },
           ),
         ],
         true, // open sky

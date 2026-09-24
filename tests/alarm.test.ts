@@ -46,13 +46,13 @@ describe('who comes to whose aid', () => {
   it('does not rope in a faction that merely tolerates the victim', () => {
     const region = town();
     const almoner = createNpc('a', 'Sister Adel', '@', '#fff', 10, 5, 'hm', { faction: 'vigil' });
-    const trooper = createMonster(MONSTERS['restorationTrooper']!, 12, 6); // neutral toward the Vigil
+    const raider = createMonster(MONSTERS['wakeRaider']!, 12, 6); // the Wake owe the Vigil nothing
     region.npcs.push(almoner);
-    region.monsters.push(trooper);
+    region.monsters.push(raider);
 
     alertAllies(region, almoner, 'player');
 
-    expect(trooper.provokedBy).toEqual([]);
+    expect(raider.provokedBy).toEqual([]);
   });
 });
 
@@ -217,11 +217,20 @@ describe('what a witness decides on arrival', () => {
   it('an ordinary bystander takes against a thug too — it is not only a militia thing', () => {
     // Maren watching someone beat Corporal Vance: no love lost between their factions, but she
     // is not going to side with the stranger doing the beating.
-    const scrapper = createNpc('m', 'Maren', '@', '#fff', 10, 5, 'hm', { faction: 'reclamation' });
-    scrapper.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'restoration' };
+    const raider = createMonster({ ...MONSTERS['wakeRaider']!, faction: 'settlers' }, 10, 5);
+    raider.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'wildlife' };
 
-    expect(resolveInvestigation(scrapper)).toBe(true);
-    expect(scrapper.provokedBy).toContain('player');
+    expect(resolveInvestigation(raider)).toBe(true);
+    expect(raider.provokedBy).toContain('player');
+  });
+
+  it('turns on someone it likes, if it watched them do it', () => {
+    // Standing well with a faction is not a licence to beat their friends in front of them.
+    const almoner = createNpc('a', 'Sister Adel', '@', '#fff', 10, 5, 'hm', { faction: 'vigil', timid: true });
+    almoner.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'restoration' };
+
+    expect(resolveInvestigation(almoner)).toBe(true);
+    expect(almoner.provokedBy).toContain('player');
   });
 
   it('but is pleased when the victim was its enemy', () => {
@@ -236,16 +245,17 @@ describe('what a witness decides on arrival', () => {
   it('only order-keepers cross a town for a noise; everyone else reacts to what is near them', () => {
     const region = town(60, 24);
     const victim = createNpc('v', 'Vance', '@', '#fff', 10, 5, 'hm', { faction: 'restoration' });
-    const nearbyTrader = createNpc('n', 'Near', '@', '#fff', 14, 8, 'hm', { faction: 'reclamation' });
-    const distantTrader = createNpc('d', 'Far', '@', '#fff', 22, 14, 'hm', { faction: 'reclamation' });
+    // Wake raiders: no love for the Restoration, so they only react to what's under their nose.
+    const nearbyRaider = createMonster(MONSTERS['wakeRaider']!, 14, 8);
+    const distantRaider = createMonster(MONSTERS['wakeRaider']!, 22, 14);
     const distantMilitia = createMonster(MONSTERS['restorationTrooper']!, 22, 16);
-    region.npcs.push(victim, nearbyTrader, distantTrader);
-    region.monsters.push(distantMilitia);
+    region.npcs.push(victim);
+    region.monsters.push(nearbyRaider, distantRaider, distantMilitia);
 
     raiseAlarm(region, victim, 'restoration', 'player');
 
-    expect(nearbyTrader.investigating).not.toBeNull(); // close enough to be their business
-    expect(distantTrader.investigating ?? null).toBeNull(); // two streets away; not their problem
+    expect(nearbyRaider.investigating).not.toBeNull(); // close enough to be their business
+    expect(distantRaider.investigating ?? null).toBeNull(); // two streets away; not their problem
     expect(distantMilitia.provokedBy).toContain('player'); // their own, so they already know
   });
 });

@@ -58,6 +58,13 @@ export const FACTIONS: Record<FactionId, FactionDef> = {
     color: '#9fd3e0',
   },
 
+  settlers: {
+    id: 'settlers',
+    name: 'the settled',
+    creed: 'People who live here. Not anybody\'s soldiers, and not going anywhere.',
+    color: '#bfae8a',
+  },
+
   // Not politics, ecology: things that leave you alone, and things that hunt.
   wildlife: { id: 'wildlife', name: 'wildlife', color: '#d2b48c' },
   predators: { id: 'predators', name: 'predators', color: '#b8860b' },
@@ -88,6 +95,7 @@ const STANDINGS: ReadonlyArray<readonly [FactionId, FactionId, Standing]> = [
   ['ghouls', 'wake', 'hostile'],
   ['ghouls', 'reclamation', 'hostile'],
   ['ghouls', 'vigil', 'hostile'],
+  ['ghouls', 'settlers', 'hostile'],
   ['ghouls', 'wildlife', 'hostile'],
   ['ghouls', 'predators', 'hostile'],
 
@@ -97,16 +105,32 @@ const STANDINGS: ReadonlyArray<readonly [FactionId, FactionId, Standing]> = [
   ['predators', 'wake', 'hostile'],
   ['predators', 'reclamation', 'hostile'],
   ['predators', 'vigil', 'hostile'],
+  ['predators', 'settlers', 'hostile'],
 
-  // The war that makes the desert dangerous.
-  ['restoration', 'wake', 'hostile'],
+  // The war that makes the desert dangerous. The Wake is everyone's problem but their own.
   ['wake', 'player', 'hostile'],
+  ['wake', 'restoration', 'hostile'],
+  ['wake', 'settlers', 'hostile'],
+
+  /*
+   * The town looks after its own.
+   *
+   * The Restoration and the Reclamation dislike each other — rival organisations with
+   * confusingly similar names — but that is temperament, not enmity, and it is carried in what
+   * they *say* rather than in this table. Mechanically they are a community: a stranger beating
+   * someone in the street brings all of them, which is what a settlement means. Modelling the
+   * rivalry as neutrality made the Restoration the one faction that neither helped nor was
+   * helped, and it read exactly as the bug it wasn't.
+   */
+  ['restoration', 'reclamation', 'friendly'],
+  ['restoration', 'vigil', 'friendly'],
+  ['restoration', 'settlers', 'friendly'],
+  ['reclamation', 'vigil', 'friendly'],
+  ['reclamation', 'settlers', 'friendly'],
+  ['vigil', 'settlers', 'friendly'],
 
   // The one faction that is glad to see anybody.
   ['vigil', 'player', 'friendly'],
-  // The Reclamation will not watch the Vigil get hurt: the almoners keep their people alive, and
-  // everyone knows it. This is also what makes a scream in the street bring more than one answer.
-  ['reclamation', 'vigil', 'friendly'],
 ];
 
 const lookup = new Map<string, Standing>();
