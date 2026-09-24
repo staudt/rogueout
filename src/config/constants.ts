@@ -71,3 +71,9 @@ export const KICK_ACCURACY_PENALTY = 20;
 
 /** How far a scream carries. Further than sight, and walls don't stop it. */
 export const ALARM_RADIUS = 14;
+
+/**
+ * How close you have to be for trouble to be *your* business, if going looking isn't your job.
+ * Order-keeping factions ignore this and answer anything they can hear.
+ */
+export const WITNESS_RADIUS = 7;

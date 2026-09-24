@@ -6,7 +6,7 @@ import { addMessage } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { chebyshevDistance, type Point } from '../utils/geometry';
 import { FACTIONS, standingBetween, type FactionId } from '../world/Factions';
-import { ALERT_RADIUS, ALARM_RADIUS } from '../config/constants';
+import { ALERT_RADIUS, ALARM_RADIUS, WITNESS_RADIUS } from '../config/constants';
 
 /**
  * Everything that can be hit, hunted, or take a turn — the player, creatures, and people.
@@ -88,11 +88,13 @@ export function alertAllies(
 /**
  * A shout, and what everyone within earshot makes of it.
  *
- * Three reactions, which is what makes a settlement feel populated rather than scripted:
+ * Reactions, which is what makes a settlement feel populated rather than scripted:
  * - **Those on the screamer's side** know whose voice it was and whose fault it is, so they turn
  *   on the offender without needing to have seen anything.
- * - **Everyone else** doesn't know what happened — only that something did. They go and look,
- *   and what they do when they arrive depends on what they find.
+ * - **Order-keepers** come from anywhere in earshot. Going looking is what a militia is for.
+ * - **Everyone else** only reacts to trouble near enough to have actually seen — a shopkeeper
+ *   two streets away has no reason to down tools over a noise. They go and look, and what they
+ *   do when they arrive depends on what they find.
  * - **The offender's own faction** hears it and doesn't care.
  *
  * Distance is the only gate. Walls don't stop sound, which is deliberate: hearing round a corner
@@ -116,10 +118,15 @@ export function raiseAlarm(
     if (standingBetween(listener.faction, screamerFaction) === 'friendly') {
       provoke(listener, offender);
       listener.investigating = { ...context };
-    } else if (!listener.investigating) {
-      // Curious, not committed. They'll form an opinion when they get there.
-      listener.investigating = { ...context };
+      continue;
     }
+
+    if (listener.investigating) continue;
+
+    const goesLooking =
+      FACTIONS[listener.faction]?.keepsOrder || chebyshevDistance(listener, at) <= WITNESS_RADIUS;
+    // Curious, not committed. They'll form an opinion when they get there.
+    if (goesLooking) listener.investigating = { ...context };
   }
 }
 
@@ -164,9 +171,10 @@ export function reactToAttack(
 /**
  * What a witness makes of the scene once they reach it.
  *
- * Most people look, find nothing that concerns them, and go back to what they were doing. An
- * order-keeping faction is different: someone they have no quarrel with was attacked in front of
- * them, and dealing with that is the entire claim they make about themselves.
+ * Anyone who watched someone they had no quarrel with get beaten takes against whoever did it.
+ * The exceptions are the honest ones: no crime if the victim was already their enemy, and none of
+ * their business if the culprit is a friend. A Wake raider watching you kick a Restoration
+ * trooper is, if anything, pleased.
  *
  * Returns true if they took it up, so the caller can say so.
  */
@@ -175,8 +183,9 @@ export function resolveInvestigation(actor: Provokable): boolean {
   actor.investigating = null;
   if (!scene?.offender || !scene.victimFaction) return false;
 
-  if (!FACTIONS[actor.faction]?.keepsOrder) return false;
-  // Not a crime if the victim was already an enemy, and not their business if the culprit is a friend.
+  // Nobody likes a thug. You don't have to be a militia to take against someone you just watched
+  // beat a person you had no quarrel with — that's ordinary, and it's what makes a town feel like
+  // it contains people rather than quest-givers.
   if (standingBetween(actor.faction, scene.victimFaction) === 'hostile') return false;
   if (standingBetween(actor.faction, scene.offender) === 'friendly') return false;
 

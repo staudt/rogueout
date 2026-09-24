@@ -18,11 +18,11 @@ export interface FactionDef {
   /** One line on what they want — the shape a quest for them would take. */
   creed?: string;
   /**
-   * Treats violence against anyone they don't already hate as a crime, and answers it.
+   * Answers trouble anywhere they can hear it, rather than only what happens in front of them.
    *
-   * This is what a militia *is*. Without it the Restoration will walk the length of a street to
-   * investigate a scream, look straight at someone beating an almoner, and wander off — which is
-   * exactly what happened before this existed.
+   * This is the difference between a militia and a shopkeeper: both will take against someone
+   * they see beating a neighbour, but only one of them goes looking. It is not what decides
+   * whether an attack counts as a crime — see resolveInvestigation.
    */
   keepsOrder?: boolean;
   /** Used to mark creatures on screen when their standing toward the player is worth showing. */

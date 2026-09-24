@@ -214,12 +214,38 @@ describe('what a witness decides on arrival', () => {
     expect(trooper.provokedBy).toEqual([]);
   });
 
-  it('and factions with no interest in order look, shrug, and carry on', () => {
+  it('an ordinary bystander takes against a thug too — it is not only a militia thing', () => {
+    // Maren watching someone beat Corporal Vance: no love lost between their factions, but she
+    // is not going to side with the stranger doing the beating.
+    const scrapper = createNpc('m', 'Maren', '@', '#fff', 10, 5, 'hm', { faction: 'reclamation' });
+    scrapper.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'restoration' };
+
+    expect(resolveInvestigation(scrapper)).toBe(true);
+    expect(scrapper.provokedBy).toContain('player');
+  });
+
+  it('but is pleased when the victim was its enemy', () => {
     const raider = createMonster(MONSTERS['wakeRaider']!, 10, 5);
-    raider.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'vigil' };
+    raider.investigating = { x: 10, y: 5, offender: 'player', victimFaction: 'restoration' };
 
     expect(resolveInvestigation(raider)).toBe(false);
     expect(raider.provokedBy).toEqual([]);
     expect(raider.investigating ?? null).toBeNull(); // curiosity satisfied either way
+  });
+
+  it('only order-keepers cross a town for a noise; everyone else reacts to what is near them', () => {
+    const region = town(60, 24);
+    const victim = createNpc('v', 'Vance', '@', '#fff', 10, 5, 'hm', { faction: 'restoration' });
+    const nearbyTrader = createNpc('n', 'Near', '@', '#fff', 14, 8, 'hm', { faction: 'reclamation' });
+    const distantTrader = createNpc('d', 'Far', '@', '#fff', 22, 14, 'hm', { faction: 'reclamation' });
+    const distantMilitia = createMonster(MONSTERS['restorationTrooper']!, 22, 16);
+    region.npcs.push(victim, nearbyTrader, distantTrader);
+    region.monsters.push(distantMilitia);
+
+    raiseAlarm(region, victim, 'restoration', 'player');
+
+    expect(nearbyTrader.investigating).not.toBeNull(); // close enough to be their business
+    expect(distantTrader.investigating ?? null).toBeNull(); // two streets away; not their problem
+    expect(distantMilitia.provokedBy).toContain('player'); // their own, so they already know
   });
 });
