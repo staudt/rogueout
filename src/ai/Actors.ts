@@ -5,7 +5,7 @@ import type { GameState, RegionState } from '../engine/GameState';
 import { addMessage, canSpot } from '../engine/GameState';
 import { MONSTERS } from '../entities/MonsterData';
 import { chebyshevDistance, type Point } from '../utils/geometry';
-import { FACTIONS, standingBetween, type FactionId } from '../world/Factions';
+import { areHostile, FACTIONS, standingBetween, type FactionId } from '../world/Factions';
 import { ALERT_RADIUS, CORPSE_NOTICE_RADIUS, SHOUT_RADIUS, WITNESS_RADIUS } from '../config/constants';
 import { hearsShout, withinEarshot } from './Hearing';
 import { narrateDistantShout, narrateShout } from '../narrative/Shouts';
@@ -76,6 +76,18 @@ export function actorAt(state: GameState, region: RegionState, x: number, y: num
     if (npc.hp > 0 && npc.x === x && npc.y === y) return npc;
   }
   return null;
+}
+
+/**
+ * Whether this creature is coming for you *right now* — the question the red ring answers, the
+ * `;` description answers, and bumping into something has to answer before it swings.
+ *
+ * Provocation counts alongside the standings table: something you kicked a moment ago is trying to
+ * kill you whatever its faction says. Lived in three places with three copies of the same
+ * reasoning until walking into a peaceful animal turned out to attack it.
+ */
+export function wantsPlayerDead(actor: Provokable, playerFaction: FactionId): boolean {
+  return actor.provokedBy.includes(playerFaction) || areHostile(playerFaction, actor.faction);
 }
 
 export function provoke(target: Provokable, faction: FactionId): boolean {

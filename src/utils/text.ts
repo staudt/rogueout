@@ -9,6 +9,14 @@ export function withArticle(name: string): string {
   return `${article} ${name}`;
 }
 
+/**
+ * "the alley rat" -> "The alley rat". For lines that begin with a label, since a label can be
+ * either a proper name or an article plus a noun and only one of those arrives capitalised.
+ */
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** "a rat" / "a rat and a goblin" / "a rat, a goblin and Old Maren". */
 export function joinWithAnd(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? '';

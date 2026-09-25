@@ -6,7 +6,8 @@ import { getTileId } from '../world/GameMap';
 import { TILES } from '../world/Tile';
 import { isExplored, isVisible } from '../fov/VisibilityState';
 import { canSpot } from '../engine/GameState';
-import { standingBetween } from '../world/Factions';
+import { standingBetween, type FactionId } from '../world/Factions';
+import { wantsPlayerDead, type Provokable } from '../ai/Actors';
 
 /** Wants you dead. */
 const HOSTILE_MARK = '#e05252';
@@ -102,12 +103,12 @@ export class Renderer {
    * nothing. Which faction someone belongs to is already carried by their glyph colour, which is
    * enough: factions are mostly a human concern.
    */
-  private drawStandingMark(screen: Point, playerFaction: string, actor: { faction: string; provokedBy: string[] }): void {
+  private drawStandingMark(screen: Point, playerFaction: string, actor: Provokable): void {
     if (actor.faction === playerFaction) return; // you don't need ringing
 
-    // Provocation counts. Someone you just kicked is trying to kill you whatever the table says,
-    // and the ring is meant to answer "is this thing coming for me right now".
-    const standing = actor.provokedBy.includes(playerFaction)
+    // Provocation counts, via the same predicate that decides whether bumping into something
+    // swings at it — the ring and the bump must never disagree about who is coming for you.
+    const standing = wantsPlayerDead(actor, playerFaction as FactionId)
       ? 'hostile'
       : standingBetween(playerFaction, actor.faction);
     if (standing === 'neutral') return;

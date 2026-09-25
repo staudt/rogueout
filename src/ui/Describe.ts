@@ -112,6 +112,8 @@ function describeMonster(state: GameState, monster: Monster): Description {
 
 function standingLine(playerFaction: string, faction: string, provokedBy: readonly string[] = []): string {
   // A grudge outranks the table: someone you just kicked is an enemy whatever their faction says.
+  // Worth keeping separate from the general case, because "you started it" is the part the player
+  // most needs told back to them.
   if (provokedBy.includes(playerFaction)) return 'It wants you dead — you started it.';
 
   switch (standingBetween(playerFaction, faction)) {

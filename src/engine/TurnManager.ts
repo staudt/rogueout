@@ -11,15 +11,13 @@ import { DAYLIGHT_SIGHT_RADIUS } from '../config/constants';
 import { resolveMeleeAttack } from '../combat/CombatResolver';
 import { dropLoot } from '../combat/Death';
 import { hasTag } from '../combat/DamageTypes';
-import type { Monster } from '../entities/Monster';
 import { recomputePlayerCombatStats } from '../entities/Player';
 import { damageEquippedWeapon } from '../items/Equipment';
 import { ITEMS } from '../items/ItemData';
 import { runMonsterTurns, runNpcTurns } from '../ai/AIScheduler';
 import { ensureRegionLoaded } from '../world/regions/RegionRegistry';
 import type { RegionTransition } from '../world/regions/RegionTypes';
-import { areHostile } from '../world/Factions';
-import { actorLabel, reactToAttack, removeActor, type Provokable } from '../ai/Actors';
+import { actorAt, actorLabel, reactToAttack, removeActor, wantsPlayerDead, type Provokable } from '../ai/Actors';
 import type { RNG } from '../utils/RNG';
 import { withArticle } from '../utils/text';
 import {
@@ -59,23 +57,26 @@ export class TurnManager {
     const vector = DIRECTION_VECTORS[direction];
     const target = addPoints(this.state.player, vector);
 
-    const targetNpc = region.npcs.find((n) => n.hp > 0 && n.x === target.x && n.y === target.y);
-    if (targetNpc) {
-      // Someone you've already fallen out with doesn't want to chat.
-      if (targetNpc.provokedBy.includes(this.state.player.faction) || areHostile(this.state.player.faction, targetNpc.faction)) {
-        this.attackActor(targetNpc);
+    // Walking into somebody: what happens depends entirely on whether they already want you dead.
+    const occupant = actorAt(this.state, region, target.x, target.y);
+    if (occupant && occupant.kind !== 'player') {
+      if (wantsPlayerDead(occupant, this.state.player.faction)) {
+        this.attackActor(occupant);
         this.advanceTurn();
         return true;
       }
-      this.events.emit('npc-interacted', { npc: targetNpc });
-      return false; // talking doesn't consume a turn, same as bumping a wall
-    }
 
-    const targetMonster = region.monsters.find((m) => m.hp > 0 && m.x === target.x && m.y === target.y);
-    if (targetMonster) {
-      this.attackMonster(targetMonster);
-      this.advanceTurn();
-      return true;
+      // Someone who'll talk, gets talked to. Chatting doesn't consume a turn, same as a wall.
+      if (occupant.kind === 'npc') {
+        this.events.emit('npc-interacted', { npc: occupant });
+        return false;
+      }
+
+      // An animal that has no quarrel with you and nothing to say. Bumping it used to *attack* it,
+      // which provoked it — so a misstep next to a cat started a fight the player never chose.
+      // Ask instead; `F` is still there for when the answer is obviously yes.
+      this.events.emit('attack-prompted', { target: occupant });
+      return false;
     }
 
     if (!isWalkable(region.map, target.x, target.y)) {
@@ -213,10 +214,6 @@ export class TurnManager {
     if (announcement) {
       addMessage(this.state, announcement);
     }
-  }
-
-  private attackMonster(monster: Monster): void {
-    this.attackActor(monster);
   }
 
   /**

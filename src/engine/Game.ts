@@ -7,7 +7,7 @@ import {
   type Direction,
   type Point,
 } from '../utils/geometry';
-import { joinWithAnd, withArticle } from '../utils/text';
+import { capitalize, joinWithAnd, withArticle } from '../utils/text';
 import { createItem } from '../items/Item';
 import { ITEMS } from '../items/ItemData';
 import { MONSTERS } from '../entities/MonsterData';
@@ -18,7 +18,7 @@ import { ensureRegionLoaded } from '../world/regions/RegionRegistry';
 import { WRIGLEYVILLE_SPAWN } from '../world/maps/wrigleyville';
 import { isWalkable } from '../world/GameMap';
 import { isExplored } from '../fov/VisibilityState';
-import { actorAt } from '../ai/Actors';
+import { actorAt, actorLabel, type Provokable } from '../ai/Actors';
 import { findPath, findPathToAny } from '../pathfinding/BFS';
 import { walkableLineToward } from '../pathfinding/StraightLine';
 import { flingItem, kickCreature } from '../combat/Kick';
@@ -132,6 +132,7 @@ export class Game {
     );
 
     this.events.on('npc-interacted', ({ npc }) => this.handleNpcInteraction(npc));
+    this.events.on('attack-prompted', ({ target }) => this.confirmAttack(target));
     // Death is set deep inside monster AI, so both the game-over screen and the save are driven
     // off the turn ending rather than from every call site that might have been the fatal one.
     this.events.on('turn-ended', () => this.onTurnEnded());
@@ -590,6 +591,34 @@ export class Game {
    * always — and leaves no way at all to start something. This is that way, and it being a
    * separate deliberate key is the point: you do not rob a shopkeeper by mistyping a direction.
    */
+  /**
+   * Walked into an animal that has no quarrel with you.
+   *
+   * It used to just hit them, which provoked them, so a misstep beside a cat began a fight nobody
+   * chose — and the same misstep beside something that *would* have talked already opened a
+   * conversation instead. This makes the two consistent: talk where there is talking to be done,
+   * and otherwise ask. One swing is all it takes to make it hostile, after which bumping attacks
+   * directly and the question stops being asked.
+   */
+  private confirmAttack(target: Provokable): void {
+    this.screens.push<boolean>({
+      title: `Attack ${actorLabel(target)}?`,
+      lines: [`${capitalize(actorLabel(target))} has no quarrel with you.`, ''],
+      options: [
+        { label: 'Leave it', value: false },
+        { label: 'Attack', value: true },
+      ],
+      onSelect: (attack) => {
+        this.screens.closeAll();
+        if (!attack) return;
+        endMessageGroup(this.state);
+        this.turnManager.attackActor(target);
+        this.turnManager.advanceTurn();
+        this.render();
+      },
+    });
+  }
+
   private fight(direction: Direction): void {
     const region = getActiveRegion(this.state);
     const vector = DIRECTION_VECTORS[direction];

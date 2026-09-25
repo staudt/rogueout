@@ -1,3 +1,4 @@
+import { capitalize } from '../utils/text';
 /**
  * Turns the outcome of a turn into a line of text.
  *
@@ -213,7 +214,7 @@ export function pickPhrase(options: readonly string[], seed: number): string {
  */
 function fill(template: string, values: Record<string, string>): string {
   const filled = template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole);
-  return filled.charAt(0).toUpperCase() + filled.slice(1);
+  return capitalize(filled);
 }
 
 const BYSTANDER_HIT: readonly string[] = [

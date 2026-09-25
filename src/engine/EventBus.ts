@@ -1,4 +1,5 @@
 import type { Npc } from '../entities/Npc';
+import type { Provokable } from '../ai/Actors';
 
 /**
  * Decouples systems from each other (e.g. UI reacting to state changes without TurnManager
@@ -10,6 +11,8 @@ export interface GameEvents {
   'item-broke': { itemId: string };
   'region-changed': { regionId: string };
   'npc-interacted': { npc: Npc };
+  /** Walked into something that has no quarrel with you: ask before starting one. */
+  'attack-prompted': { target: Provokable };
   [event: string]: unknown;
 }
 
