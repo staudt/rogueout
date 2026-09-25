@@ -20,6 +20,27 @@ export const TILES: Record<string, TileDef> = {
    */
   door: { id: 'door', glyph: '+', fg: '#c98b3a', bg: '#1a1208', walkable: true, opaque: true },
 
+  // The city (world/generation/city/*). Backgrounds are solid, like the outdoor terrain below:
+  // a city drawn as bare glyphs on black reads as a wireframe maze rather than as streets between
+  // buildings, which is the same lesson the sand background taught.
+  /** Asphalt. The city's open ground, and the thing blocks are the complement of. */
+  street: { id: 'street', glyph: '.', fg: '#75757c', bg: '#14141a', walkable: true, opaque: false },
+  /** An intact building exterior. */
+  brick: { id: 'brick', glyph: '#', fg: '#95503d', bg: '#231310', walkable: false, opaque: true },
+  /**
+   * Debris you can pick your way over. The one tile that makes ruin interesting rather than just
+   * subtractive: a collapsed building becomes a shortcut through a block instead of a longer wall.
+   */
+  rubble: { id: 'rubble', glyph: ':', fg: '#9c9288', bg: '#1d1b17', walkable: true, opaque: false },
+  /**
+   * Collapse too total to cross. This is what district boundaries are made of, and what the outer
+   * edge of an area is filled with, so the world ends in rubble rather than an arbitrary wall.
+   *
+   * Shares `*` with `rock`, deliberately: both mean "impassable heap", and they never appear in
+   * the same kind of place — rock is open terrain, ruin is a city block. The colours differ.
+   */
+  ruin: { id: 'ruin', glyph: '*', fg: '#5d574f', bg: '#151311', walkable: false, opaque: true },
+
   // Wilderness terrain (M6, produced by world/generation/*). Glyphs are picked to not collide with
   // any item glyph (`)`, `[`, `!`) or monster glyph (lowercase letters), so a tile is never
   // mistakable for something standing on it.

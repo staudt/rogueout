@@ -10,36 +10,17 @@ import { ITEMS } from '../src/items/ItemData';
 import { MONSTERS } from '../src/entities/MonsterData';
 import { createRNG } from '../src/utils/RNG';
 import { chebyshevDistance, linePoints } from '../src/utils/geometry';
-import {
-  generateOverworld,
-  OVERWORLD_DUNGEON_ENTRANCE,
-  OVERWORLD_HERB_POS,
-  OVERWORLD_SEED,
-  OVERWORLD_STORE_DOOR,
-  OVERWORLD_SPAWN,
-  OVERWORLD_SPAWN_FROM_DUNGEON,
-} from '../src/world/maps/overworld';
-
-/** A spread of seeds, so "works for every seed" claims aren't really "works for the one we shipped". */
-const SEEDS = [OVERWORLD_SEED, 0, 1, 7, 42, 999, 123456, 2 ** 31 - 1];
 
 /**
- * Generation is deterministic in its seed, so generating the same world once per assertion is
- * pure waste — this file did it around twenty times over. Memoized per seed, which keeps every
- * test reading as "generate this seed and check X" while doing the work once.
+ * A spread of seeds, so "works for every seed" claims aren't really "works for the one we shipped".
  *
- * Deliberately not used by the determinism test below, which has to call the real thing twice.
+ * These test the generation *passes*, which are setting-agnostic and outlived the desert that first
+ * needed them: noise, biome thresholds, corridor carving, pocket sealing and POI scattering are all
+ * still here and all still used — the city uses the last three, and the first two are waiting for
+ * the evaporated lakebed. What went with the desert was only the composition of them into one
+ * particular map; the city's equivalent is `city-generation.test.ts`.
  */
-type GeneratedWorld = ReturnType<typeof generateOverworld>;
-const generated = new Map<number, GeneratedWorld>();
-
-function worldFor(seed: number): GeneratedWorld {
-  const cached = generated.get(seed);
-  if (cached) return cached;
-  const world = generateOverworld(seed);
-  generated.set(seed, world);
-  return world;
-}
+const SEEDS = [20260923, 0, 1, 7, 42, 999, 123456, 2 ** 31 - 1];
 
 describe('value noise', () => {
   it('is deterministic for the same seed and coordinates', () => {
@@ -189,66 +170,4 @@ describe('POI scattering', () => {
       }
     }
   });
-});
-
-describe('generated overworld', () => {
-  it('is reproducible from its seed, and different across seeds', () => {
-    expect(generateOverworld(4242).map.tiles).toEqual(generateOverworld(4242).map.tiles);
-    expect(generateOverworld(4242).map.tiles).not.toEqual(generateOverworld(4243).map.tiles);
-  });
-
-  it('keeps the handcrafted town intact', () => {
-    const { map } = generateOverworld();
-    expect(isWalkable(map, OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y)).toBe(true);
-    expect(isWalkable(map, OVERWORLD_HERB_POS.x, OVERWORLD_HERB_POS.y)).toBe(true);
-
-    // The store is a solid block with one real door; its inside is a separate region.
-    expect(getTileId(map, OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y)).toBe('door');
-    expect(isWalkable(map, OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y)).toBe(true);
-    expect(isWalkable(map, 12, 6)).toBe(false);
-    expect(isWalkable(map, 13, 6)).toBe(false);
-  });
-
-  it('walls off the edge of the world', () => {
-    const { map } = generateOverworld();
-    for (let x = 0; x < map.width; x++) {
-      expect(isWalkable(map, x, 0)).toBe(false);
-      expect(isWalkable(map, x, map.height - 1)).toBe(false);
-    }
-    for (let y = 0; y < map.height; y++) {
-      expect(isWalkable(map, 0, y)).toBe(false);
-      expect(isWalkable(map, map.width - 1, y)).toBe(false);
-    }
-  });
-
-  // The guarantees that have to hold for EVERY seed, not just the shipped one: you can always walk
-  // town -> dungeon, you're never returned from the dungeon onto an unwalkable tile, and the map
-  // never contains an unreachable walkable pocket.
-  for (const seed of SEEDS) {
-    it(`seed ${seed}: town, dungeon entrance, and all POIs are mutually reachable`, () => {
-      const { map, pois } = worldFor(seed);
-      const reached = reachableWalkable(map, OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y);
-
-      expect(reached.has(`${OVERWORLD_DUNGEON_ENTRANCE.x},${OVERWORLD_DUNGEON_ENTRANCE.y}`)).toBe(true);
-      expect(reached.has(`${OVERWORLD_SPAWN_FROM_DUNGEON.x},${OVERWORLD_SPAWN_FROM_DUNGEON.y}`)).toBe(true);
-      expect(reached.has(`${OVERWORLD_STORE_DOOR.x},${OVERWORLD_STORE_DOOR.y}`)).toBe(true);
-
-      for (const poi of pois) {
-        expect(reached.has(`${poi.x},${poi.y}`)).toBe(true);
-        if (poi.guard) expect(reached.has(`${poi.guard.x},${poi.guard.y}`)).toBe(true);
-      }
-    });
-
-    it(`seed ${seed}: has exactly one walkable component and some POIs`, () => {
-      const { map, pois } = worldFor(seed);
-      const reached = reachableWalkable(map, OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y);
-
-      for (let y = 0; y < map.height; y++) {
-        for (let x = 0; x < map.width; x++) {
-          if (isWalkable(map, x, y)) expect(reached.has(`${x},${y}`)).toBe(true);
-        }
-      }
-      expect(pois.length).toBeGreaterThanOrEqual(2);
-    });
-  }
 });

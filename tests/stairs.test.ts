@@ -7,10 +7,10 @@ import { createRNG } from '../src/utils/RNG';
 import { narrateWaiting } from '../src/narrative/Narration';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { isWalkable } from '../src/world/GameMap';
-import { OVERWORLD_DUNGEON_ENTRANCE } from '../src/world/maps/overworld';
+import { ADDISON_STATION_STAIRS } from '../src/world/maps/wrigleyville';
 import { DUNGEON1_EXIT_WEST, DUNGEON1_SPAWN_FROM_WILDERNESS } from '../src/world/maps/dungeonLevel1';
 
-function makeGame(x: number, y: number, regionId = 'overworld') {
+function makeGame(x: number, y: number, regionId = 'wrigleyville') {
   const regions: Record<string, RegionState> = {};
   ensureRegionLoaded(regions, regionId);
 
@@ -31,20 +31,20 @@ describe('stairways need a deliberate >/<', () => {
   it('walking onto a staircase does not transition — it just stands on it', () => {
     // This is what keeps auto-travel from dropping you into a dungeon because the route happened
     // to cross the entrance.
-    const approach = { x: OVERWORLD_DUNGEON_ENTRANCE.x - 1, y: OVERWORLD_DUNGEON_ENTRANCE.y };
+    const approach = { x: ADDISON_STATION_STAIRS.x - 1, y: ADDISON_STATION_STAIRS.y };
     const { state, turnManager } = makeGame(approach.x, approach.y);
-    expect(isWalkable(state.regions['overworld']!.map, approach.x, approach.y)).toBe(true);
+    expect(isWalkable(state.regions['wrigleyville']!.map, approach.x, approach.y)).toBe(true);
 
     expect(turnManager.tryMovePlayer('E')).toBe(true);
 
-    expect(state.activeRegionId).toBe('overworld');
-    expect(state.player).toMatchObject(OVERWORLD_DUNGEON_ENTRANCE);
+    expect(state.activeRegionId).toBe('wrigleyville');
+    expect(state.player).toMatchObject(ADDISON_STATION_STAIRS);
     expect(turnManager.transitionUnderPlayer()).toBe('down');
     expect(state.messageLog.join(' ')).toMatch(/stairs down/i);
   });
 
   it('> on the staircase crosses into the dungeon', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_DUNGEON_ENTRANCE.x, OVERWORLD_DUNGEON_ENTRANCE.y);
+    const { state, turnManager } = makeGame(ADDISON_STATION_STAIRS.x, ADDISON_STATION_STAIRS.y);
 
     expect(turnManager.useTransition('down')).toBe(true);
 
@@ -54,11 +54,11 @@ describe('stairways need a deliberate >/<', () => {
   });
 
   it('the wrong stair key costs nothing', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_DUNGEON_ENTRANCE.x, OVERWORLD_DUNGEON_ENTRANCE.y);
+    const { state, turnManager } = makeGame(ADDISON_STATION_STAIRS.x, ADDISON_STATION_STAIRS.y);
 
     expect(turnManager.useTransition('up')).toBe(false);
 
-    expect(state.activeRegionId).toBe('overworld');
+    expect(state.activeRegionId).toBe('wrigleyville');
     expect(state.turnCount).toBe(0);
     expect(state.messageLog.at(-1)).toContain('no staircase leading up');
   });
@@ -83,7 +83,7 @@ describe('stairways need a deliberate >/<', () => {
 
     expect(turnManager.tryMovePlayer('W')).toBe(true);
 
-    expect(state.activeRegionId).toBe('overworld');
+    expect(state.activeRegionId).toBe('wrigleyville');
   });
 });
 

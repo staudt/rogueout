@@ -14,16 +14,16 @@ import { createItem } from '../src/items/Item';
 import { createRNG } from '../src/utils/RNG';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { isExplored } from '../src/fov/VisibilityState';
-import { OVERWORLD_SPAWN } from '../src/world/maps/overworld';
+import { WRIGLEYVILLE_SPAWN } from '../src/world/maps/wrigleyville';
 
 function makeRun(): { state: GameState; turnManager: TurnManager } {
   const regions: Record<string, RegionState> = {};
-  ensureRegionLoaded(regions, 'overworld');
+  ensureRegionLoaded(regions, 'wrigleyville');
 
   const state: GameState = {
-    player: createPlayer(OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y),
+    player: createPlayer(WRIGLEYVILLE_SPAWN.x, WRIGLEYVILLE_SPAWN.y),
     regions,
-    activeRegionId: 'overworld',
+    activeRegionId: 'wrigleyville',
     turnCount: 0,
     messageLog: [],
     gameOver: false,
@@ -55,7 +55,7 @@ describe('save/load round trip', () => {
     expect(loaded!.player.caps).toBe(42);
     expect(loaded!.player.inventory.map((i) => i.defId)).toEqual(['machete']);
     expect(loaded!.turnCount).toBe(state.turnCount);
-    expect(loaded!.activeRegionId).toBe('overworld');
+    expect(loaded!.activeRegionId).toBe('wrigleyville');
     // Joined rather than per-line: everything from one player turn shares a log line.
     expect(loaded!.messageLog.join(' ')).toContain('You do something memorable.');
     expect(loaded!.gameOver).toBe(false);
@@ -66,12 +66,12 @@ describe('save/load round trip', () => {
     const { state, turnManager } = makeRun();
     turnManager.tryMovePlayer('E');
 
-    const before = state.regions['overworld']!;
+    const before = state.regions['wrigleyville']!;
     const raider = MONSTERS['wakeRaider']!;
     before.monsters.push(createMonster(raider, 30, 12));
 
     saveGame(storage, state);
-    const after = loadGame(storage)!.regions['overworld']!;
+    const after = loadGame(storage)!.regions['wrigleyville']!;
 
     expect(after.map.tiles).toEqual(before.map.tiles);
     // Fog of war survives exactly: you don't re-explore ground you already walked, and ground
@@ -94,7 +94,7 @@ describe('save/load round trip', () => {
     saveGame(storage, state);
     const loaded = loadGame(storage)!;
 
-    expect(Object.keys(loaded.regions).sort()).toEqual(['dungeon-1', 'overworld']);
+    expect(Object.keys(loaded.regions).sort()).toEqual(['dungeon-1', 'wrigleyville']);
     // A cleared dungeon stays cleared.
     expect(loaded.regions['dungeon-1']!.monsters).toEqual([]);
   });
@@ -105,7 +105,7 @@ describe('save/load round trip', () => {
     const storage = createMemoryStorage();
     const { state } = makeRun();
     for (let i = 0; i < 5; i++) state.player.inventory.push(createItem('medPack'));
-    state.regions['overworld']!.monsters.push(createMonster(MONSTERS['dustRat']!, 25, 10));
+    state.regions['wrigleyville']!.monsters.push(createMonster(MONSTERS['dustRat']!, 25, 10));
 
     saveGame(storage, state);
     const loaded = loadGame(storage)!;
@@ -113,7 +113,7 @@ describe('save/load round trip', () => {
     const loadedItemIds = new Set(loaded.player.inventory.map((i) => i.id));
     expect(loadedItemIds.has(createItem('machete').id)).toBe(false);
 
-    const loadedMonsterIds = new Set(loaded.regions['overworld']!.monsters.map((m) => m.id));
+    const loadedMonsterIds = new Set(loaded.regions['wrigleyville']!.monsters.map((m) => m.id));
     expect(loadedMonsterIds.has(createMonster(MONSTERS['dustRat']!, 1, 1).id)).toBe(false);
   });
 });
@@ -198,7 +198,7 @@ describe('malformed saves fall back to New Game', () => {
     // length, real palette indices — so this gets past migrate's shape checks and is caught only
     // by decoding it and finding the grid short of its own width x height. That's the corruption
     // worth guarding: a half-written save that looks fine until you stand in it.
-    const tiles = parsed.regions['overworld'].map.tiles;
+    const tiles = parsed.regions['wrigleyville'].map.tiles;
     tiles.runs = tiles.runs.slice(0, -2);
     return JSON.stringify(parsed);
   }

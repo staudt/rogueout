@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ensureRegionLoaded, REGIONS, STORE_INTERIOR_RECIPE } from '../src/world/regions/RegionRegistry';
+import { ensureRegionLoaded, REGIONS } from '../src/world/regions/RegionRegistry';
+import { CLUBHOUSE_RECIPE } from '../src/world/regions/clubhouse';
 import type { RegionRecipe } from '../src/world/regions/RegionTypes';
 import { isWalkable, type GameMapData } from '../src/world/GameMap';
 import type { RegionState } from '../src/engine/GameState';
@@ -63,7 +64,7 @@ describe('handcrafted region connectivity', () => {
       id: def.id,
       load: () => ensureRegionLoaded({}, def.id),
     })),
-    ...([STORE_INTERIOR_RECIPE] as RegionRecipe[]).map((recipe) => ({
+    ...([CLUBHOUSE_RECIPE] as RegionRecipe[]).map((recipe) => ({
       id: recipe.regionId,
       load: () => ensureRegionLoaded({}, recipe.regionId, recipe),
     })),

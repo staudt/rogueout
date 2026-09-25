@@ -5,6 +5,7 @@ import { chebyshevDistance, type Point } from '../src/utils/geometry';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { isWalkable, type GameMapData } from '../src/world/GameMap';
 import type { RegionState } from '../src/engine/GameState';
+import { WRIGLEYVILLE } from '../src/world/maps/wrigleyville';
 
 function isPassableFor(rows: readonly string[]) {
   return (x: number, y: number): boolean => {
@@ -223,98 +224,70 @@ describe('walkableLineToward (heading for somewhere you cannot reach)', () => {
   });
 });
 
-describe('no single creature can cut the world in half (the real overworld)', () => {
+describe('no single body can hold the way to a landmark', () => {
   /**
-   * This used to be false. Before the map became a desert, the road crossed a lake on a causeway
-   * exactly one tile wide, and one wandering rat standing on it cut off 695 of 1538 walkable
-   * tiles — 45% of the world, unreachable until it moved. Making water rare removed the bridge
-   * and with it the chokepoint.
+   * This replaces an older guard that asserted no single creature could cut the *world* in half.
+   * That was the right test for a desert and is the wrong one for a city: ruins forming chokepoints
+   * between districts is now the point, and a boundary of collapse with one cleared path through it
+   * is a feature rather than a fault. What must stay true is narrower and more useful — **the
+   * places that matter must not be behind a single tile**, because one wandering raider standing in
+   * a doorway would then lock the player out of the shop, the tunnels, or their own settlement.
    *
-   * Guarded rather than merely fixed, because it's the kind of thing terrain tuning can
-   * reintroduce silently: any future map where one body can sever the world will fail here.
+   * Asked exactly, rather than sampled. A tile that separates the entry from a target has to lie on
+   * *every* route between them, so it must lie on the one route BFS already found: testing the
+   * tiles of a single path is both cheap and complete.
    */
-  const MAX_CUT_FRACTION = 0.05;
+  it('leaves at least two ways to every transition in Wrigleyville', () => {
+    const regions: Record<string, RegionState> = {};
+    const region = ensureRegionLoaded(regions, 'wrigleyville');
+    const entry = WRIGLEYVILLE.entry;
+    const grid = { ...region.map, isPassable: (x: number, y: number) => isWalkable(region.map, x, y) };
 
-  function worstSingleTileCut(map: GameMapData): { cut: number; walkable: number } {
-    const walkable: Array<[number, number]> = [];
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) if (isWalkable(map, x, y)) walkable.push([x, y]);
-    }
+    expect(region.transitions.length).toBeGreaterThan(0);
 
-    let worst = 0;
-    for (const [bx, by] of walkable) {
-      // Prune: if this tile's walkable neighbours form one unbroken run around it, they can all
-      // reach each other by walking around it, so removing it cannot disconnect anything. That
-      // skips essentially every tile in the open desert and turns an 8-second scan into a fast
-      // one, without weakening the guarantee — the prune only ever rules out non-cut tiles.
-      if (!couldBeAChokepoint(map, bx, by)) continue;
+    for (const target of region.transitions) {
+      const route = findPath(entry, target, grid);
+      expect(route, `no route at all to ${target.toRegion}`).not.toBeNull();
 
-      const start = walkable.find(([x, y]) => !(x === bx && y === by))!;
-      const open = (x: number, y: number) => isWalkable(map, x, y) && !(x === bx && y === by);
+      for (const step of route!) {
+        // Only a tile whose walkable neighbours come in two or more separate runs can possibly be
+        // a cut vertex — anything else can be walked around. The prune never rules out a real one,
+        // and it skips almost every tile of a street, which is what keeps this fast.
+        if (!couldBeAChokepoint(region.map, step.x, step.y)) continue;
+        if (step.x === target.x && step.y === target.y) continue; // the doorway itself is allowed to be one
 
-      const seen = new Set<string>([`${start[0]},${start[1]}`]);
-      const queue: Array<[number, number]> = [start];
-      for (let head = 0; head < queue.length; head++) {
-        const [x, y] = queue[head]!;
-        for (const [dx, dy] of NEIGHBOURS) {
-          const nx = x + dx;
-          const ny = y + dy;
-          const key = `${nx},${ny}`;
-          if (seen.has(key) || !open(nx, ny)) continue;
-          seen.add(key);
-          queue.push([nx, ny]);
-        }
+        const without = {
+          ...grid,
+          isPassable: (x: number, y: number) =>
+            isWalkable(region.map, x, y) && !(x === step.x && y === step.y),
+        };
+        expect(
+          findPath(entry, target, without),
+          `${step.x},${step.y} is the only way to ${target.toRegion}`,
+        ).not.toBeNull();
       }
-      worst = Math.max(worst, walkable.length - 1 - seen.size);
     }
-
-    return { cut: worst, walkable: walkable.length };
-  }
+  });
 
   /** True when the tile's walkable neighbours come in two or more separate runs around it. */
   function couldBeAChokepoint(map: GameMapData, x: number, y: number): boolean {
     const ring = RING.map(([dx, dy]) => isWalkable(map, x + dx, y + dy));
     let runs = 0;
     for (let i = 0; i < ring.length; i++) {
-      const previous = ring[(i + ring.length - 1) % ring.length];
-      if (ring[i] && !previous) runs++;
+      if (ring[i] && !ring[(i + ring.length - 1) % ring.length]) runs++;
     }
     return runs >= 2;
   }
 
   /** The eight neighbours in circular order, so consecutive entries are adjacent to each other. */
   const RING = [
-    [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+    [-1, 1],
+    [-1, 0],
+    [-1, -1],
+    [0, -1],
+    [1, -1],
   ] as const;
-
-  const NEIGHBOURS = [
-    [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
-  ] as const;
-
-  // Only the shipped seed: this is O(walkable squared) and one map is enough to catch a
-  // regression in the generator's tuning.
-  it('blocking any one tile strands only a pocket, never a continent', () => {
-    const regions: Record<string, RegionState> = {};
-    const map = ensureRegionLoaded(regions, 'overworld').map;
-
-    const { cut, walkable } = worstSingleTileCut(map);
-
-    expect(cut / walkable).toBeLessThan(MAX_CUT_FRACTION);
-  });
-
-  it('and when something does block the way, the player still sets off toward it', () => {
-    // A one-tile gap in a wall, held by a creature: the click can't reach, so it walks the line.
-    const rows = ['.......', '###.###', '.......', '.......'];
-    const chokepoint = { x: 3, y: 1 };
-    const isPassable = (x: number, y: number) =>
-      isPassableFor(rows)(x, y) && !(x === chokepoint.x && y === chokepoint.y);
-    const goal = { x: 3, y: 0 };
-
-    expect(findPath({ x: 3, y: 3 }, goal, { ...gridFor(rows), isPassable })).toBeNull();
-
-    // From back down the corridor, you walk up to whatever is holding the gap and stop there.
-    expect(walkableLineToward({ x: 3, y: 3 }, goal, isPassable)).toEqual([{ x: 3, y: 2 }]);
-    // Already nose to nose with it: nowhere closer to stand, so nothing happens.
-    expect(walkableLineToward({ x: 3, y: 2 }, goal, isPassable)).toEqual([]);
-  });
 });

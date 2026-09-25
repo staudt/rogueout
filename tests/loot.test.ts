@@ -266,12 +266,12 @@ describe('scavengers', () => {
 });
 
 describe('patrols', () => {
-  it('the overworld spawns two hostile bands on the same road', () => {
+  it('wrigleyville spawns two hostile bands on the same road', () => {
     const regions: Record<string, RegionState> = {};
-    const overworld = ensureRegionLoaded(regions, 'overworld');
+    const wrigleyville = ensureRegionLoaded(regions, 'wrigleyville');
 
-    const wake = overworld.monsters.filter((m) => m.defId === 'wakeRaider');
-    const restoration = overworld.monsters.filter((m) => m.defId === 'restorationTrooper');
+    const wake = wrigleyville.monsters.filter((m) => m.defId === 'wakeRaider');
+    const restoration = wrigleyville.monsters.filter((m) => m.defId === 'restorationTrooper');
 
     expect(wake.length).toBeGreaterThanOrEqual(3);
     expect(restoration.length).toBeGreaterThanOrEqual(3);
@@ -280,33 +280,38 @@ describe('patrols', () => {
 
   it('puts them on the road, which is what makes them meet', () => {
     const regions: Record<string, RegionState> = {};
-    const overworld = ensureRegionLoaded(regions, 'overworld');
+    const wrigleyville = ensureRegionLoaded(regions, 'wrigleyville');
 
-    expect(overworld.patrolRoute?.length).toBeGreaterThan(3);
-    const patrollers = overworld.monsters.filter((m) => m.patrolIndex !== undefined);
+    // The route now runs along Addison rather than the old desert's road, but the guarantee is the
+    // same: it must exist, and every patroller must actually be standing on walkable ground.
+    expect(wrigleyville.patrolRoute?.length).toBeGreaterThan(3);
+    const patrollers = wrigleyville.monsters.filter((m) => m.patrolIndex !== undefined);
     expect(patrollers.length).toBeGreaterThanOrEqual(6);
     for (const patroller of patrollers) {
-      expect(isWalkable(overworld.map, patroller.x, patroller.y)).toBe(true);
+      expect(isWalkable(wrigleyville.map, patroller.x, patroller.y)).toBe(true);
     }
 
     // Ruin guards are raiders too, and must stay at their ruin rather than wander off up the road.
-    const guards = overworld.monsters.filter((m) => m.defId === 'wakeRaider' && m.patrolIndex === undefined);
+    const guards = wrigleyville.monsters.filter((m) => m.defId === 'wakeRaider' && m.patrolIndex === undefined);
     expect(guards.every((g) => g.patrolIndex === undefined)).toBe(true);
   });
 
   it('walks the route, rather than milling about', () => {
     const regions: Record<string, RegionState> = {};
-    const overworld = ensureRegionLoaded(regions, 'overworld');
+    const wrigleyville = ensureRegionLoaded(regions, 'wrigleyville');
+    // Spawn the player on the route itself rather than a hardcoded corner of the old desert map —
+    // any tile the band already walks is guaranteed walkable on whatever street table ships next.
+    const playerStart = wrigleyville.patrolRoute![0]!;
     const state: GameState = {
-      player: createPlayer(2, 2),
-      regions: { overworld },
-      activeRegionId: 'overworld',
+      player: createPlayer(playerStart.x, playerStart.y),
+      regions: { wrigleyville },
+      activeRegionId: 'wrigleyville',
       turnCount: 0,
       messageLog: [],
       gameOver: false,
     };
 
-    const band = overworld.monsters.filter((m) => m.defId === 'wakeRaider');
+    const band = wrigleyville.monsters.filter((m) => m.defId === 'wakeRaider');
     const start = band.map((m) => `${m.x},${m.y}`);
 
     for (let turn = 0; turn < 12; turn++) {

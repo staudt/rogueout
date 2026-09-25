@@ -15,7 +15,7 @@ import { addItem, consumeOne, removeItem } from '../items/Inventory';
 import { SHOPS } from '../world/ShopData';
 import type { Npc } from '../entities/Npc';
 import { ensureRegionLoaded } from '../world/regions/RegionRegistry';
-import { OVERWORLD_SPAWN } from '../world/maps/overworld';
+import { WRIGLEYVILLE_SPAWN } from '../world/maps/wrigleyville';
 import { isWalkable } from '../world/GameMap';
 import { isExplored } from '../fov/VisibilityState';
 import { actorAt } from '../ai/Actors';
@@ -178,18 +178,18 @@ export class Game {
     this.saveFailureReported = false;
 
     const regions: Record<string, RegionState> = {};
-    ensureRegionLoaded(regions, 'overworld');
+    ensureRegionLoaded(regions, 'wrigleyville');
 
     this.adoptState({
-      player: createPlayer(OVERWORLD_SPAWN.x, OVERWORLD_SPAWN.y),
+      player: createPlayer(WRIGLEYVILLE_SPAWN.x, WRIGLEYVILLE_SPAWN.y),
       regions,
-      activeRegionId: 'overworld',
+      activeRegionId: 'wrigleyville',
       turnCount: 0,
       messageLog: [],
       gameOver: false,
     });
 
-    addMessage(this.state, 'You set out. The road runs east.');
+    addMessage(this.state, 'You come round on the concourse. Somebody brought you in off the street.');
   }
 
   /** Points the game at a state — freshly made or freshly loaded — and rebuilds what hangs off it. */

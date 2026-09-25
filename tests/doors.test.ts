@@ -4,14 +4,22 @@ import { EventBus, type GameEvents } from '../src/engine/EventBus';
 import type { GameState, RegionState } from '../src/engine/GameState';
 import { createPlayer } from '../src/entities/Player';
 import { createRNG } from '../src/utils/RNG';
-import { ensureRegionLoaded, REGION_BUILDERS, STORE_INTERIOR_RECIPE } from '../src/world/regions/RegionRegistry';
+import { ensureRegionLoaded, REGION_BUILDERS } from '../src/world/regions/RegionRegistry';
+import { CLUBHOUSE_RECIPE } from '../src/world/regions/clubhouse';
 import { getTileId } from '../src/world/GameMap';
 import { isDeliberateTransition, transitionKind } from '../src/world/Tile';
-import { OVERWORLD_STORE_DOOR } from '../src/world/maps/overworld';
+import { WRIGLEY_CLUBHOUSE_DOOR } from '../src/world/landmarks/wrigleyField';
+import { WRIGLEY_ORIGIN } from '../src/world/maps/wrigleyville';
 import { createMemoryStorage } from '../src/persistence/LocalStorageAdapter';
 import { loadGame, saveGame } from '../src/persistence/SaveGame';
 
-function makeGame(x: number, y: number, regionId = 'overworld') {
+/** The clubhouse door, in world coordinates. */
+const DOOR = {
+  x: WRIGLEY_ORIGIN.x + WRIGLEY_CLUBHOUSE_DOOR.x,
+  y: WRIGLEY_ORIGIN.y + WRIGLEY_CLUBHOUSE_DOOR.y,
+};
+
+function makeGame(x: number, y: number, regionId = 'wrigleyville') {
   const regions: Record<string, RegionState> = {};
   ensureRegionLoaded(regions, regionId);
 
@@ -34,83 +42,82 @@ describe('the door tile', () => {
     expect(isDeliberateTransition('door')).toBe(true);
   });
 
-  it('blocks sight, so a shop interior cannot be read off the street', () => {
+  it('blocks sight, so an interior cannot be read from outside', () => {
     // The reason this matters is auto-travel and FOV both: an opaque doorway means a building is
     // genuinely a box until you go in, rather than a box you can see through one gap of.
-    const { state } = makeGame(1, 1);
-    expect(state.regions['overworld']!.map.tiles.includes('door')).toBe(true);
+    const { state } = makeGame(DOOR.x, DOOR.y);
+    expect(state.regions['wrigleyville']!.map.tiles.includes('door')).toBe(true);
   });
 
   it('does not cross when you merely walk onto it', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x - 1, OVERWORLD_STORE_DOOR.y);
+    const { state, turnManager } = makeGame(DOOR.x - 1, DOOR.y);
 
     expect(turnManager.tryMovePlayer('E')).toBe(true);
-    expect(state.player).toMatchObject(OVERWORLD_STORE_DOOR);
-    expect(state.activeRegionId).toBe('overworld');
+    expect(state.player).toMatchObject(DOOR);
+    expect(state.activeRegionId).toBe('wrigleyville');
     expect(turnManager.transitionUnderPlayer()).toBe('door');
   });
 });
 
 describe('going through a door', () => {
   it('> from the doorway enters the interior', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
 
     expect(turnManager.useTransition('down')).toBe(true);
-    expect(state.activeRegionId).toBe(STORE_INTERIOR_RECIPE.regionId);
-    expect(state.regions[STORE_INTERIOR_RECIPE.regionId]).toBeDefined();
-    expect(state.regions[STORE_INTERIOR_RECIPE.regionId]!.name).toBe(STORE_INTERIOR_RECIPE.name);
+    expect(state.activeRegionId).toBe(CLUBHOUSE_RECIPE.regionId);
+    expect(state.regions[CLUBHOUSE_RECIPE.regionId]).toBeDefined();
+    expect(state.regions[CLUBHOUSE_RECIPE.regionId]!.name).toBe(CLUBHOUSE_RECIPE.name);
   });
 
   it('< works too — a doorway takes either key', () => {
     // There is only ever one transition on a tile, so there is nothing to disambiguate, and
     // making the player work out which side of a door they are on would be friction with no
     // decision behind it.
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
 
     expect(turnManager.useTransition('up')).toBe(true);
-    expect(state.activeRegionId).toBe(STORE_INTERIOR_RECIPE.regionId);
+    expect(state.activeRegionId).toBe(CLUBHOUSE_RECIPE.regionId);
   });
 
-  it('puts the shopkeeper inside, where you have to go in to trade with her', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
+  it('holds the loot somebody stashed in there', () => {
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
     turnManager.useTransition('down');
 
-    const inside = state.regions[STORE_INTERIOR_RECIPE.regionId]!;
-    expect(inside.npcs.map((n) => n.shopId)).toContain('reclamationPost');
-    expect(state.regions['overworld']!.npcs.some((n) => n.shopId === 'reclamationPost')).toBe(false);
+    const inside = state.regions[CLUBHOUSE_RECIPE.regionId]!;
+    expect(inside.groundItems.length).toBeGreaterThan(0);
   });
 
   it('comes back out onto the street', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
     turnManager.useTransition('down');
 
-    const inside = state.regions[STORE_INTERIOR_RECIPE.regionId]!;
+    const inside = state.regions[CLUBHOUSE_RECIPE.regionId]!;
     const exit = inside.transitions[0]!;
     state.player.x = exit.x;
     state.player.y = exit.y;
 
     expect(getTileId(inside.map, exit.x, exit.y)).toBe('door');
     expect(turnManager.useTransition('up')).toBe(true);
-    expect(state.activeRegionId).toBe('overworld');
+    expect(state.activeRegionId).toBe('wrigleyville');
   });
 
   it('keeps the interior as you left it across visits', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
     turnManager.useTransition('down');
 
-    // Rob the place and leave.
-    state.regions[STORE_INTERIOR_RECIPE.regionId]!.npcs = [];
-    const exit = state.regions[STORE_INTERIOR_RECIPE.regionId]!.transitions[0]!;
+    // Empty the place and leave.
+    state.regions[CLUBHOUSE_RECIPE.regionId]!.groundItems = [];
+    const exit = state.regions[CLUBHOUSE_RECIPE.regionId]!.transitions[0]!;
     state.player.x = exit.x;
     state.player.y = exit.y;
     turnManager.useTransition('up');
 
     // Come back. The recipe must NOT be used to rebuild it, or everything you did is undone.
-    state.player.x = OVERWORLD_STORE_DOOR.x;
-    state.player.y = OVERWORLD_STORE_DOOR.y;
+    state.player.x = DOOR.x;
+    state.player.y = DOOR.y;
     turnManager.useTransition('down');
 
-    expect(state.regions[STORE_INTERIOR_RECIPE.regionId]!.npcs).toEqual([]);
+    expect(state.regions[CLUBHOUSE_RECIPE.regionId]!.groundItems).toEqual([]);
   });
 });
 
@@ -119,8 +126,8 @@ describe('a transition can stand in for distance', () => {
     // Unused by any content yet, and deliberately covered anyway: this is how the city will elide
     // the ~10 blocks between landmarks, and machinery that is written but never exercised is
     // machinery that has quietly stopped working by the time somebody needs it.
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
-    const door = state.regions['overworld']!.transitions.find((t) => t.x === OVERWORLD_STORE_DOOR.x)!;
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
+    const door = state.regions['wrigleyville']!.transitions.find((t) => t.x === DOOR.x && t.y === DOOR.y)!;
     door.turnCost = 40;
     door.announce = 'A long walk through the dark.';
 
@@ -130,14 +137,14 @@ describe('a transition can stand in for distance', () => {
     expect(state.turnCount).toBe(before + 41); // the 40 charged, plus the turn the crossing took
     expect(state.messageLog.join(' ')).toContain('A long walk through the dark.');
     // Its own line replaces the destination's arrival text, rather than following it.
-    expect(state.messageLog.join(' ')).not.toContain('Shelves of salvage');
+    expect(state.messageLog.join(' ')).not.toContain('Lockers');
   });
 });
 
 describe('region recipes', () => {
   it('builds the same room from the same recipe every time', () => {
-    const first = REGION_BUILDERS['storeInterior']!(STORE_INTERIOR_RECIPE);
-    const second = REGION_BUILDERS['storeInterior']!(STORE_INTERIOR_RECIPE);
+    const first = REGION_BUILDERS['clubhouse']!(CLUBHOUSE_RECIPE);
+    const second = REGION_BUILDERS['clubhouse']!(CLUBHOUSE_RECIPE);
 
     expect(first.map.tiles).toEqual(second.map.tiles);
     expect(first.transitions).toEqual(second.transitions);
@@ -145,13 +152,13 @@ describe('region recipes', () => {
 
   it('refuses a region it has neither a definition nor a recipe for', () => {
     expect(() => ensureRegionLoaded({}, 'nowhere')).toThrow(/Unknown region/);
-    expect(() => ensureRegionLoaded({}, 'nowhere', { ...STORE_INTERIOR_RECIPE, regionId: 'elsewhere' })).toThrow(
+    expect(() => ensureRegionLoaded({}, 'nowhere', { ...CLUBHOUSE_RECIPE, regionId: 'elsewhere' })).toThrow(
       /Unknown region/,
     );
   });
 
   it('refuses a recipe naming a builder that does not exist', () => {
-    const broken = { ...STORE_INTERIOR_RECIPE, builderId: 'nonesuch' };
+    const broken = { ...CLUBHOUSE_RECIPE, builderId: 'nonesuch' };
     expect(() => ensureRegionLoaded({}, broken.regionId, broken)).toThrow(/Unknown region builder/);
   });
 
@@ -159,35 +166,35 @@ describe('region recipes', () => {
     // The property the whole recipe design exists for. Registering interiors into the REGIONS
     // table as they are generated would not survive this: module-level state is gone after a
     // reload, so the door would lead to a region nothing knew how to build.
-    const { state } = makeGame(1, 1);
-    expect(state.regions[STORE_INTERIOR_RECIPE.regionId]).toBeUndefined(); // never opened
+    const { state } = makeGame(DOOR.x - 6, DOOR.y + 8);
+    expect(state.regions[CLUBHOUSE_RECIPE.regionId]).toBeUndefined(); // never opened
 
     const storage = createMemoryStorage();
     expect(saveGame(storage, state)).toBe(true);
 
     const reloaded = loadGame(storage);
     expect(reloaded).not.toBeNull();
-    expect(reloaded!.regions[STORE_INTERIOR_RECIPE.regionId]).toBeUndefined();
+    expect(reloaded!.regions[CLUBHOUSE_RECIPE.regionId]).toBeUndefined();
 
     // ...and the door still works, because the recipe travelled on the saved transition.
-    reloaded!.player.x = OVERWORLD_STORE_DOOR.x;
-    reloaded!.player.y = OVERWORLD_STORE_DOOR.y;
+    reloaded!.player.x = DOOR.x;
+    reloaded!.player.y = DOOR.y;
     const turnManager = new TurnManager(reloaded!, new EventBus<GameEvents>(), createRNG(1));
 
     expect(turnManager.useTransition('down')).toBe(true);
-    expect(reloaded!.activeRegionId).toBe(STORE_INTERIOR_RECIPE.regionId);
-    expect(reloaded!.regions[STORE_INTERIOR_RECIPE.regionId]!.npcs).toHaveLength(1);
+    expect(reloaded!.activeRegionId).toBe(CLUBHOUSE_RECIPE.regionId);
+    expect(reloaded!.regions[CLUBHOUSE_RECIPE.regionId]!.groundItems.length).toBeGreaterThan(0);
   });
 
   it('restores an interior you HAD entered rather than rebuilding it', () => {
-    const { state, turnManager } = makeGame(OVERWORLD_STORE_DOOR.x, OVERWORLD_STORE_DOOR.y);
+    const { state, turnManager } = makeGame(DOOR.x, DOOR.y);
     turnManager.useTransition('down');
-    state.regions[STORE_INTERIOR_RECIPE.regionId]!.npcs = [];
+    state.regions[CLUBHOUSE_RECIPE.regionId]!.groundItems = [];
 
     const storage = createMemoryStorage();
     saveGame(storage, state);
     const reloaded = loadGame(storage)!;
 
-    expect(reloaded.regions[STORE_INTERIOR_RECIPE.regionId]!.npcs).toEqual([]);
+    expect(reloaded.regions[CLUBHOUSE_RECIPE.regionId]!.groundItems).toEqual([]);
   });
 });

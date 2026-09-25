@@ -10,8 +10,8 @@ function makeState(): GameState {
     player: createPlayer(1, 1),
     // A real region, because the name now comes off the region's own state rather than a lookup
     // in a static table — which is what lets a generated interior have a name at all.
-    regions: { overworld: ensureRegionLoaded({}, 'overworld') } as Record<string, RegionState>,
-    activeRegionId: 'overworld',
+    regions: { wrigleyville: ensureRegionLoaded({}, 'wrigleyville') } as Record<string, RegionState>,
+    activeRegionId: 'wrigleyville',
     turnCount: 31,
     messageLog: [],
     gameOver: false,
@@ -30,7 +30,7 @@ describe('status bar', () => {
     expect(find(state, 'Caps')?.value).toBe('15');
     expect(find(state, 'Turn')?.value).toBe('31');
     // The unlabelled field is where you are.
-    expect(fields.find((f) => f.label === '')?.value).toBe('the desert');
+    expect(fields.find((f) => f.label === '')?.value).toBe('Wrigleyville');
   });
 
   it('flags low HP, and only when it is actually low', () => {
