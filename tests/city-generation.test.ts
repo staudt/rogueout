@@ -142,17 +142,45 @@ describe('generateCity', () => {
       const count = (id: string) => map.tiles.filter((t) => t === id).length;
 
       const walkable = walkableCount(map) / total;
-      expect(walkable).toBeGreaterThan(0.25);
-      expect(walkable).toBeLessThan(0.5);
+      expect(walkable).toBeGreaterThan(0.3);
+      expect(walkable).toBeLessThan(0.55);
 
-      // **Roads stay the fastest way around, but no longer the only one.** Half the blocks are now
-      // cave you can sometimes cut through, which is the point of them — so this is deliberately
-      // weaker than the old "street beats rubble outright" and stronger than nothing. Roadway
-      // alone, not counting pavement, still has to beat the crossable ruin.
-      expect(count('street')).toBeGreaterThan(count('rubble'));
+      // The place has to stay mostly solid, or it is a field with some walls in it.
+      expect((count('brick') + count('ruin') + count('thicket')) / total).toBeGreaterThan(0.38);
+    });
 
-      // And the place has to stay mostly solid, or it is a field with some walls in it.
-      expect((count('brick') + count('ruin')) / total).toBeGreaterThan(0.4);
+    it(`seed ${seed}: leaves the street grid intact and still readable as streets`, () => {
+      // This replaced a straight "street tiles outnumber rubble tiles" count, which stopped
+      // measuring anything once weeds could grow on a road: the tile counts moved without the
+      // grid getting any worse. What actually matters is that the declared roads are still there
+      // to walk down, and still *look* like roads rather than having vanished under the greenery.
+      const { map } = cityFor(seed);
+
+      let roadTiles = 0;
+      let walkableRoad = 0;
+      let bareRoad = 0;
+
+      for (const street of WRIGLEYVILLE.streets) {
+        const rect = streetRect(street, WRIGLEYVILLE);
+        for (let y = Math.max(0, rect.y0); y <= Math.min(map.height - 1, rect.y1); y++) {
+          for (let x = Math.max(0, rect.x0); x <= Math.min(map.width - 1, rect.x1); x++) {
+            roadTiles += 1;
+            if (isWalkable(map, x, y)) walkableRoad += 1;
+            const tile = getTileId(map, x, y);
+            if (tile === 'street' || tile === 'sidewalk') bareRoad += 1;
+          }
+        }
+      }
+
+      // Not all of it survives, and that is the design: `StreetGraph.bury` deliberately takes
+      // stretches of road to make the collapse that divides one district from the next, refusing
+      // only the ones that would disconnect the lattice. Around one street tile in six goes that
+      // way. What must hold is that most of the grid is still there...
+      expect(walkableRoad / roadTiles).toBeGreaterThan(0.75);
+
+      // ...and that the part you can walk still *looks* like road rather than having disappeared
+      // under the greenery, which is the thing weeds could quietly undo.
+      expect(bareRoad / walkableRoad).toBeGreaterThan(0.6);
     });
 
     it(`seed ${seed}: has both textures — standing frontage and collapsed cave`, () => {
@@ -162,7 +190,7 @@ describe('generateCity', () => {
       const count = (id: string) => map.tiles.filter((t) => t === id).length;
 
       expect(count('brick')).toBeGreaterThan(400); // buildings still lining streets
-      expect(count('rubble')).toBeGreaterThan(800); // cave you can walk into
+      expect(count('rubble')).toBeGreaterThan(600); // cave you can walk into
     });
   }
 });
@@ -232,6 +260,45 @@ describe('landmarks', () => {
       streets: [...WRIGLEYVILLE.streets, { name: 'Nonesuch Street', axis: 'ew', at: WRIGLEY_ORIGIN.y + 10, width: 4 }],
     };
     expect(() => generateCity(broken, WRIGLEYVILLE_SEED)).toThrow(/runs through Wrigley Field/);
+  });
+});
+
+describe('vegetation', () => {
+  it('greens the ruins and breaks up the roads, without swallowing either', () => {
+    // The area shipped with no growth at all outside the ball park and read as sterile — a ruin is
+    // not a city with the people removed, it is a city with a forest coming up through it. Growing
+    // road and rubble at the same rate then went too far the other way, putting a third of the map
+    // under weed. Rubble greens far more readily than asphalt, which is both true and legible.
+    const { map } = cityFor(WRIGLEYVILLE_SEED);
+    const total = map.tiles.length;
+    const count = (id: string) => map.tiles.filter((t) => t === id).length;
+
+    expect(count('weeds') / total).toBeGreaterThan(0.06);
+    expect(count('weeds') / total).toBeLessThan(0.25);
+    expect(count('thicket')).toBeGreaterThan(300);
+  });
+
+  it('never grows a thicket across a street', () => {
+    // A thicket is impassable, so it follows the same rule the deep water does: nothing that can
+    // close a road may be written onto one, and the street lattice is safe by construction.
+    const { map } = cityFor(WRIGLEYVILLE_SEED);
+
+    for (const street of WRIGLEYVILLE.streets) {
+      const rect = streetRect(street, WRIGLEYVILLE);
+      for (let y = Math.max(0, rect.y0); y <= Math.min(map.height - 1, rect.y1); y++) {
+        for (let x = Math.max(0, rect.x0); x <= Math.min(map.width - 1, rect.x1); x++) {
+          expect(getTileId(map, x, y), `thicket on ${street.name}`).not.toBe('thicket');
+        }
+      }
+    }
+  });
+
+  it('leaves the ball park field the one kept green thing', () => {
+    // Weeds are a duller green than the field on purpose. If the whole map were the same green the
+    // bowl would stop being a place and start being more of the same.
+    const { map } = cityFor(WRIGLEYVILLE_SEED);
+    expect(getTileId(map, WRIGLEY_ORIGIN.x + 15, WRIGLEY_ORIGIN.y + 15)).toBe('grass');
+    expect(TILES['weeds']!.fg).not.toBe(TILES['grass']!.fg);
   });
 });
 

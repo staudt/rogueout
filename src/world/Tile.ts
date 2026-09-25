@@ -66,6 +66,18 @@ export const TILES: Record<string, TileDef> = {
    * to share a glyph across a passability difference, which is why the moat's barrier is `water`.
    */
   swamp: { id: 'swamp', glyph: '"', fg: '#6f8250', bg: '#101609', walkable: true, opaque: false },
+  /**
+   * What thirty years does to asphalt. Walkable, and a duller green than the ball park's kept
+   * grass — which is deliberate, so that the field still reads as the one tended green thing in
+   * the area rather than as more of the same.
+   */
+  weeds: { id: 'weeds', glyph: '"', fg: '#5d7a44', bg: '#0e140b', walkable: true, opaque: false },
+  /**
+   * A thicket that has come up through a ruin: unwalkable and sight-blocking, like the `tree` it
+   * shares its nature with. Confined to block interiors, never a street, for the same reason the
+   * deep water is — nothing that can grow across a road may cut the street lattice.
+   */
+  thicket: { id: 'thicket', glyph: 'T', fg: '#3f8a3a', bg: '#0d140a', walkable: false, opaque: true },
   rock: { id: 'rock', glyph: '*', fg: '#7a7a7a', bg: '#121212', walkable: false, opaque: true },
   tree: { id: 'tree', glyph: 'T', fg: '#2f7d32', bg: '#0c1408', walkable: false, opaque: true },
 };

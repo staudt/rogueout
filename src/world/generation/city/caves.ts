@@ -15,7 +15,7 @@ import type { CityCanvas } from './CityCanvas';
  * genuinely blocked in others. That is what makes it worth exploring rather than merely a hole:
  * you can cut through some of them, and you find out which by trying.
  */
-const INITIAL_SOLID = 55; // per cent; below ~44 the caves open into one room, above ~50 they close up
+const INITIAL_SOLID = 67; // per cent; lower opens the caves into one room, higher closes them up
 const SMOOTHING_PASSES = 4;
 /** A tile goes solid when at least this many of its eight neighbours are. The classic 4-5 rule. */
 const SOLID_THRESHOLD = 5;
@@ -41,10 +41,7 @@ function seed(width: number, height: number, rng: RNG): Uint8Array {
   const solid = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      // The block's own edge starts solid, so a cave doesn't spill onto the pavement as a
-      // ragged fringe. Where it opens onto the street is decided afterwards, deliberately.
-      const onEdge = x === 0 || y === 0 || x === width - 1 || y === height - 1;
-      solid[y * width + x] = onEdge || randomInt(rng, 0, 99) < INITIAL_SOLID ? 1 : 0;
+      solid[y * width + x] = randomInt(rng, 0, 99) < INITIAL_SOLID ? 1 : 0;
     }
   }
   return solid;
@@ -60,9 +57,14 @@ function smooth(solid: Uint8Array, width: number, height: number): Uint8Array {
           if (dx === 0 && dy === 0) continue;
           const nx = x + dx;
           const ny = y + dy;
-          // Off the edge counts as solid, which keeps the cave from opening at its own border.
-          if (nx < 0 || ny < 0 || nx >= width || ny >= height) neighbours++;
-          else neighbours += solid[ny * width + nx]!;
+          // **Off the block counts as open**, which is the opposite of the usual convention and
+          // is the whole point. Counting it solid — and forcing the block's border solid to match
+          // — walled every caved block off behind an unbroken, sight-blocking frontage, so from
+          // the pavement a ruin was indistinguishable from an intact building and the passages
+          // inside it might as well not have existed. Letting the caves reach their own edge means
+          // the ruin is ragged and open where it meets the street, and you can see into it.
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          neighbours += solid[ny * width + nx]!;
         }
       }
       next[y * width + x] = neighbours >= SOLID_THRESHOLD ? 1 : 0;
@@ -72,14 +74,14 @@ function smooth(solid: Uint8Array, width: number, height: number): Uint8Array {
 }
 
 /**
- * Breaks a cave open onto the streets around it, at a few points rather than everywhere.
+ * Cuts a few extra ways in, on top of whatever the automata already left open at the block's edge.
  *
- * Without this a caved block is a sealed lump that `sealDisconnectedAreas` would quietly fill in
- * entirely, and the city would lose exactly the thing that makes ruin interesting — that you can
- * sometimes cut through a block instead of walking round it. A handful of mouths is also how it
- * reads: the ruin has given way in places, not along the whole frontage.
+ * Since caves now reach their own border, most blocks are open to the street without any help.
+ * This remains as insurance for the occasional block that closes up anyway — a sealed lump is one
+ * `sealDisconnectedAreas` would quietly fill in entirely, taking with it the thing that makes ruin
+ * worth having: that you can sometimes cut through a block instead of walking round it.
  */
-export function openCaveMouths(canvas: CityCanvas, block: Rect, rng: RNG, count = 3): void {
+export function openCaveMouths(canvas: CityCanvas, block: Rect, rng: RNG, count = 4): void {
   const width = block.x1 - block.x0 + 1;
   const height = block.y1 - block.y0 + 1;
 

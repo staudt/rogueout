@@ -14,6 +14,7 @@ import { CityCanvas } from './CityCanvas';
 import { fillBlock } from './blocks';
 import { fillCave, openCaveMouths } from './caves';
 import { applyFlooding, floodCore, floodFringe } from './flooding';
+import { applyVegetation } from './vegetation';
 import { applyRuin, blockDamage } from './ruin';
 import { StreetGraph } from './StreetGraph';
 
@@ -151,6 +152,10 @@ export function generateCity(area: AreaDef, seed: number): GeneratedCity {
   // 5b. Flooding, last of the terrain passes so it lands on the finished ground. Impassable water
   //     is confined to block interiors, so it can never cut the street lattice.
   applyFlooding(canvas, map, seed);
+
+  // 5c. Growth. Last, so it comes up through whatever the other passes left — weeds through the
+  //     asphalt, thickets in the blocks. A ruin is not a city with the people taken out of it.
+  applyVegetation(canvas, map, seed);
 
   // 6. Repair anything still stranded, in *rubble* rather than street: somebody cleared a way
   //    through the debris, which is what the city would actually look like. A road appearing out
