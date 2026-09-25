@@ -8,11 +8,13 @@ import type { RegionTransition } from '../../regions/RegionTypes';
 import { LANDMARKS, landmarkRect, type LandmarkDef } from '../../landmarks/LandmarkRegistry';
 import { reachableWalkable, sealDisconnectedAreas } from '../connectivity';
 import { carveCorridor } from '../stitching';
-import type { Rect } from '../Rect';
+import { rectContains, type Rect } from '../Rect';
 import { blockRects, streetRect, type AreaDef } from './AreaDef';
 import { CityCanvas } from './CityCanvas';
 import { fillBlock } from './blocks';
-import { applyRuin } from './ruin';
+import { fillCave, openCaveMouths } from './caves';
+import { applyFlooding, floodCore, floodFringe } from './flooding';
+import { applyRuin, blockDamage } from './ruin';
 import { StreetGraph } from './StreetGraph';
 
 export interface GeneratedCity {
@@ -41,9 +43,29 @@ export function generateCity(area: AreaDef, seed: number): GeneratedCity {
   const map = createGameMap(area.width, area.height, 'ruin');
   const canvas = new CityCanvas(map);
 
-  // 2. The street lattice, full width. Connected by construction.
-  for (const street of area.streets) {
-    canvas.fill(clampRect(streetRect(street, area), area), 'street');
+  // 2. The street lattice, full width. Connected by construction. The outermost tile on each
+  //    side is pavement: the same glyph in a paler colour, so a street reads as a road with edges
+  //    rather than as a band of undifferentiated grey. It is walkable and carries no mechanics.
+  const streetRects = area.streets.map((street) => clampRect(streetRect(street, area), area));
+  for (const rect of streetRects) canvas.fill(rect, 'street');
+
+  // The kerbs, laid afterwards and **interrupted at every junction**: a kerb line running straight
+  // through a crossroads is the sort of thing you only notice once, and then cannot stop noticing.
+  for (let i = 0; i < streetRects.length; i++) {
+    const rect = streetRects[i]!;
+    const vertical = area.streets[i]!.axis === 'ns';
+    const kerbs = vertical
+      ? [{ ...rect, x1: rect.x0 }, { ...rect, x0: rect.x1 }]
+      : [{ ...rect, y1: rect.y0 }, { ...rect, y0: rect.y1 }];
+
+    for (const kerb of kerbs) {
+      for (let y = kerb.y0; y <= kerb.y1; y++) {
+        for (let x = kerb.x0; x <= kerb.x1; x++) {
+          const atJunction = streetRects.some((other, j) => j !== i && rectContains(other, x, y));
+          if (!atJunction) canvas.set(x, y, 'sidewalk');
+        }
+      }
+    }
   }
   const graph = new StreetGraph(area);
 
@@ -90,11 +112,32 @@ export function generateCity(area: AreaDef, seed: number): GeneratedCity {
     }
   }
 
-  // 4. Buildings, only ever inside a block rect — which is the complement of the lattice, so no
-  //    building can land on a street however the subdivision falls.
+  // 3b. Authored water. After the landmarks, so a moat can be drawn tight against one, and
+  //     protected afterwards so nothing later fills it in.
+  //     Every core first, then every fringe, then protection — an L-shaped moat is two
+  //     overlapping rects, and finishing each one in turn left its corner wadeable.
+  for (const rect of area.water ?? []) floodCore(canvas, rect);
+  for (const rect of area.water ?? []) floodFringe(canvas, map, rect);
+  for (const rect of area.water ?? []) {
+    canvas.protect({ x0: rect.x0 - 1, y0: rect.y0 - 1, x1: rect.x1 + 1, y1: rect.y1 + 1 });
+  }
+
+  // 4. The blocks. Roughly half are still buildings and half have come down into cave, decided
+  //    by the same damage field the ruin pass uses so that it comes in drifts — a run of standing
+  //    frontage, then a run of collapse — rather than alternating block by block.
+  //
+  //    Buildings are written only inside a block rect, which is the complement of the lattice, so
+  //    none can land on a street however the subdivision falls. Caved blocks are deliberately not
+  //    added to `footprints`: they have already collapsed and the ruin pass has nothing to say
+  //    about them.
   const footprints: Rect[] = [];
   for (const block of blockRects(area)) {
-    footprints.push(...fillBlock(canvas, block, rng));
+    if (hasCollapsed(block, seed, area.decay ?? 0)) {
+      fillCave(canvas, block, rng);
+      openCaveMouths(canvas, block, rng);
+    } else {
+      footprints.push(...fillBlock(canvas, block, rng));
+    }
   }
 
   // 5. Damage. The only pass that writes everywhere, and the only one that needs guarding: it
@@ -104,6 +147,10 @@ export function generateCity(area: AreaDef, seed: number): GeneratedCity {
     decay: area.decay ?? 0,
     boundaries: area.boundaries ?? [],
   });
+
+  // 5b. Flooding, last of the terrain passes so it lands on the finished ground. Impassable water
+  //     is confined to block interiors, so it can never cut the street lattice.
+  applyFlooding(canvas, map, seed);
 
   // 6. Repair anything still stranded, in *rubble* rather than street: somebody cleared a way
   //    through the debris, which is what the city would actually look like. A road appearing out
@@ -136,6 +183,19 @@ export function generateCity(area: AreaDef, seed: number): GeneratedCity {
 
   return { map, ...contents, patrolRoute: patrolAlong(area, map) };
 }
+
+/**
+ * Whether a block has come down. Read off the same damage field the ruin pass uses, at the block's
+ * centre, so collapse arrives in drifts and a caved block sits next to other wrecked ones.
+ */
+function hasCollapsed(block: Rect, seed: number, decay: number): boolean {
+  const cx = (block.x0 + block.x1) / 2;
+  const cy = (block.y0 + block.y1) / 2;
+  return blockDamage(cx, cy, seed, decay) >= COLLAPSE_THRESHOLD;
+}
+
+/** Tuned so that roughly half the blocks are cave and half are still buildings. */
+const COLLAPSE_THRESHOLD = 0.53;
 
 function clampRect(rect: Rect, area: AreaDef): Rect {
   return {

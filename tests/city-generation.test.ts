@@ -47,13 +47,32 @@ describe('the street lattice', () => {
   });
 
   it('produces blocks with Chicago proportions — wider than tall', () => {
-    // A Chicago block is 660 x 330 ft, long axis east-west. Square blocks would be the single most
-    // visible way to get the city wrong, so the street table is checked rather than trusted.
+    // A Chicago block is 660 x 330 ft; at ~20 ft a tile that is 33 x 17, long axis east-west.
+    // Square blocks would be the single most visible way to get the city wrong, so the street
+    // table is checked rather than trusted — it got this wrong once already.
     const blocks = blockRects(WRIGLEYVILLE);
     expect(blocks.length).toBeGreaterThan(8);
 
     const wider = blocks.filter((b) => b.x1 - b.x0 > b.y1 - b.y0);
     expect(wider.length).toBeGreaterThan(blocks.length / 2);
+  });
+
+  it('gives every street a tile of pavement on each side', () => {
+    // Five across: kerb, three of roadway, kerb. The pavement carries no mechanics — it exists so
+    // a street reads as a road with edges rather than a band of undifferentiated grey.
+    const { map } = cityFor(WRIGLEYVILLE_SEED);
+
+    for (const street of WRIGLEYVILLE.streets) {
+      expect(street.width).toBe(5);
+      const rect = streetRect(street, WRIGLEYVILLE);
+      // Sample at the middle of the area, away from any landmark or authored water.
+      const along = street.axis === 'ns' ? Math.floor(WRIGLEYVILLE.height / 2) : Math.floor(WRIGLEYVILLE.width / 2);
+      const at = (i: number) =>
+        street.axis === 'ns' ? getTileId(map, rect.x0 + i, along) : getTileId(map, along, rect.y0 + i);
+
+      const band = [0, 1, 2, 3, 4].map(at);
+      expect(band.every((t) => TILES[t]?.walkable)).toBe(true);
+    }
   });
 
   it('refuses to bury a stretch of street that would cut the lattice in two', () => {
@@ -118,19 +137,32 @@ describe('generateCity', () => {
     });
 
     it(`seed ${seed}: reads as a city rather than a field or a maze`, () => {
-      // Streets must be the main way around. When rubble outnumbered them the place read as open
-      // ground with some walls in it, which is the opposite of a city.
       const { map } = cityFor(seed);
       const total = map.tiles.length;
       const count = (id: string) => map.tiles.filter((t) => t === id).length;
 
       const walkable = walkableCount(map) / total;
-      expect(walkable).toBeGreaterThan(0.2);
-      expect(walkable).toBeLessThan(0.55);
-      // Streets must stay the main way around. This held for some seeds and not others until the
-      // damage thresholds were tuned against it, so it is a real guarantee rather than a hope.
+      expect(walkable).toBeGreaterThan(0.25);
+      expect(walkable).toBeLessThan(0.5);
+
+      // **Roads stay the fastest way around, but no longer the only one.** Half the blocks are now
+      // cave you can sometimes cut through, which is the point of them — so this is deliberately
+      // weaker than the old "street beats rubble outright" and stronger than nothing. Roadway
+      // alone, not counting pavement, still has to beat the crossable ruin.
       expect(count('street')).toBeGreaterThan(count('rubble'));
-      expect(count('brick') / total).toBeGreaterThan(0.08); // enough still standing to be streets
+
+      // And the place has to stay mostly solid, or it is a field with some walls in it.
+      expect((count('brick') + count('ruin')) / total).toBeGreaterThan(0.4);
+    });
+
+    it(`seed ${seed}: has both textures — standing frontage and collapsed cave`, () => {
+      // The even mix the whole look rests on. One texture without the other is either a tidy
+      // model village or an undifferentiated rubble field.
+      const { map } = cityFor(seed);
+      const count = (id: string) => map.tiles.filter((t) => t === id).length;
+
+      expect(count('brick')).toBeGreaterThan(400); // buildings still lining streets
+      expect(count('rubble')).toBeGreaterThan(800); // cave you can walk into
     });
   }
 });
@@ -177,7 +209,7 @@ describe('landmarks', () => {
 
   it('keeps the field green and the bowl crossable', () => {
     const { map } = cityFor(WRIGLEYVILLE_SEED);
-    const middle = { x: WRIGLEY_ORIGIN.x + 20, y: WRIGLEY_ORIGIN.y + 20 };
+    const middle = { x: WRIGLEY_ORIGIN.x + 15, y: WRIGLEY_ORIGIN.y + 15 };
 
     expect(getTileId(map, middle.x, middle.y)).toBe('grass');
     const reached = reachableWalkable(map, WRIGLEYVILLE.entry.x, WRIGLEYVILLE.entry.y);
@@ -200,6 +232,50 @@ describe('landmarks', () => {
       streets: [...WRIGLEYVILLE.streets, { name: 'Nonesuch Street', axis: 'ew', at: WRIGLEY_ORIGIN.y + 10, width: 4 }],
     };
     expect(() => generateCity(broken, WRIGLEYVILLE_SEED)).toThrow(/runs through Wrigley Field/);
+  });
+});
+
+describe('water', () => {
+  it('floods ground in places, without ever flooding a street impassably', () => {
+    // Impassable water is confined to block interiors on purpose: that is what keeps flooding from
+    // cutting the street lattice, and it means the flood pass needs no dealings with StreetGraph.
+    // Walkable swamp may go anywhere, road included — a flooded street still gets you there.
+    const { map } = cityFor(WRIGLEYVILLE_SEED);
+    const count = (id: string) => map.tiles.filter((t) => t === id).length;
+
+    expect(count('water')).toBeGreaterThan(50);
+    expect(count('swamp')).toBeGreaterThan(200);
+
+    for (const street of WRIGLEYVILLE.streets) {
+      const rect = streetRect(street, WRIGLEYVILLE);
+      for (let y = rect.y0; y <= rect.y1; y++) {
+        for (let x = rect.x0; x <= rect.x1; x++) {
+          expect(getTileId(map, x, y), `water on ${street.name} at ${x},${y}`).not.toBe('water');
+        }
+      }
+    }
+  });
+
+  it('puts a moat round the park that you cannot simply wade', () => {
+    // A moat made of walkable swamp would protect nothing, so the barrier is water with a reed
+    // fringe. The marquee approach is deliberately left dry — which is why the Wake raid the
+    // settlement rather than walking into it.
+    const { map } = cityFor(WRIGLEYVILLE_SEED);
+    const moat = WRIGLEYVILLE.water!;
+    expect(moat.length).toBeGreaterThan(0);
+
+    for (const rect of moat) {
+      for (let y = rect.y0; y <= rect.y1; y++) {
+        for (let x = rect.x0; x <= rect.x1; x++) {
+          expect(isWalkable(map, x, y), `moat is wadeable at ${x},${y}`).toBe(false);
+        }
+      }
+    }
+
+    // ...and the gate is still reachable, or the settlement would be moated shut.
+    const gate = { x: WRIGLEY_ORIGIN.x + 4, y: WRIGLEY_ORIGIN.y + WRIGLEY_SIZE - 1 };
+    const reached = reachableWalkable(map, WRIGLEYVILLE.entry.x, WRIGLEYVILLE.entry.y);
+    expect(reached.has(`${gate.x},${gate.y}`)).toBe(true);
   });
 });
 

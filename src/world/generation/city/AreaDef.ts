@@ -18,7 +18,11 @@ export interface StreetDef {
   axis: 'ns' | 'ew';
   /** The street's near edge — its low x for 'ns', low y for 'ew'. */
   at: number;
-  /** Tiles across. 4 for a residential street, 6-7 for a major avenue. */
+  /**
+   * Tiles across, **including a tile of pavement on each side**. Five is the standard: kerb,
+   * three of roadway, kerb. Anything narrower than three has no road left once the pavement is
+   * taken out of it.
+   */
   width: number;
 }
 
@@ -52,6 +56,11 @@ export interface AreaDef {
    * which is the whole reason it's here — it is the thing the player follows toward the Loop.
    */
   elevated?: Rect[];
+  /**
+   * Authored standing water: the settlement's moat, a blocked channel. Drawn with a reed fringe
+   * and then protected, since a defence is only a defence where its builders put it.
+   */
+  water?: Rect[];
   /** How ruined the area is overall, 0..1. Higher buries more of it. */
   decay?: number;
 }

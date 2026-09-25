@@ -16,13 +16,29 @@ import { CLUBHOUSE_ENTRY, CLUBHOUSE_RECIPE } from '../regions/clubhouse';
  * crossing a transition and being told where you are. The one transition here is the clubhouse
  * door, which is where the door machinery gets its city-side outing.
  */
-export const WRIGLEY_SIZE = 40;
+export const WRIGLEY_SIZE = 30;
+
+/** The gates' x offsets, landmark-local. Exported so tests can ask about the way in and out. */
+export const WRIGLEY_GATE_XS = [4, 23];
 
 /** Local coordinates, 0,0 at the park's north-west corner. */
-const GATE = { x: 4, width: 2 };
-const CLUBHOUSE_BLOCK = { x0: 16, y0: 1, x1: 22, y1: 3 };
+/**
+ * Two gates onto Addison. The marquee is the one at Clark and Addison; the second is down at the
+ * other end of the wall, as the real park has gates all along it.
+ *
+ * Not a fix for anything — a single *two-tile* gate already survives the articulation guard in
+ * `pathfinding.test.ts`, because no one body can stand in both halves of it. (A one-tile gate does
+ * not, and the guard says so.) The second gate is there because two independent ways out is better
+ * than one wide one: it survives two creatures in the gateway, not just one, and a settlement with
+ * a single point of entry is a place you can be penned into by bad luck.
+ */
+const GATES = [
+  { x: 4, width: 2 },
+  { x: 23, width: 2 },
+];
+const CLUBHOUSE_BLOCK = { x0: 12, y0: 1, x1: 17, y1: 2 };
 /** Landmark-local. Exported so the area can work out where you come back out. */
-export const WRIGLEY_CLUBHOUSE_DOOR: Point = { x: 19, y: 3 };
+export const WRIGLEY_CLUBHOUSE_DOOR: Point = { x: 14, y: 2 };
 
 /** Where the player wakes: on the concourse, just inside the marquee. */
 export const WRIGLEY_SPAWN: Point = { x: 4, y: WRIGLEY_SIZE - 3 };
@@ -34,8 +50,8 @@ export const WRIGLEY_SPAWN: Point = { x: 4, y: WRIGLEY_SIZE - 3 };
 function bandAt(x: number, y: number): string {
   const depth = Math.min(x, y, WRIGLEY_SIZE - 1 - x, WRIGLEY_SIZE - 1 - y);
   if (depth === 0) return 'brick'; // the outer wall, all the way round
-  if (depth <= 3) return 'floor'; // concourse
-  if (depth <= 7) return 'rubble'; // grandstand, come down
+  if (depth <= 2) return 'floor'; // concourse
+  if (depth <= 5) return 'rubble'; // grandstand, come down
   return 'grass'; // the field — the only green for miles, and it should read that way
 }
 
@@ -55,16 +71,16 @@ export const WRIGLEY_FIELD: LandmarkDef = {
     // Two upper-deck sections that came down, authored rather than rolled: the park should be the
     // same place every game, so that "the collapsed section on the third-base side" can ever mean
     // anything to a player.
-    for (let y = 8; y <= 14; y++) {
-      for (let x = 4; x <= 9; x++) put(x, y, 'ruin');
+    for (let y = 6; y <= 11; y++) {
+      for (let x = 3; x <= 7; x++) put(x, y, 'ruin');
     }
-    for (let y = 26; y <= 31; y++) {
-      for (let x = 30; x <= 35; x++) put(x, y, 'ruin');
+    for (let y = 19; y <= 23; y++) {
+      for (let x = 22; x <= 26; x++) put(x, y, 'ruin');
     }
 
-    // The marquee gate, at the Clark and Addison corner, opened straight onto the street.
-    for (let i = 0; i < GATE.width; i++) {
-      put(GATE.x + i, WRIGLEY_SIZE - 1, 'street');
+    // The gates, opened straight onto Addison — seamless, with nothing to cross.
+    for (const gate of GATES) {
+      for (let i = 0; i < gate.width; i++) put(gate.x + i, WRIGLEY_SIZE - 1, 'street');
     }
 
     // The clubhouse, tucked under the stands, with the one door in the whole landmark.
@@ -77,8 +93,8 @@ export const WRIGLEY_FIELD: LandmarkDef = {
   anchors: [
     WRIGLEY_SPAWN,
     WRIGLEY_CLUBHOUSE_DOOR,
-    { x: GATE.x, y: WRIGLEY_SIZE - 1 },
-    { x: 20, y: 20 }, // the middle of the field
+    ...GATES.map((gate) => ({ x: gate.x, y: WRIGLEY_SIZE - 1 })),
+    { x: 15, y: 15 }, // the middle of the field
   ],
 
   contents: (origin) => {
@@ -98,46 +114,46 @@ export const WRIGLEY_FIELD: LandmarkDef = {
       // The settlement. The Vigil hold the park and the Reclamation trade on the concourse; the
       // Restoration are pointedly *not* here — they hold the roads south, which is a reason to go.
       npcs: [
-        npc('almoner', 'Sister Adel of the Vigil', VIGIL, at(8, 34), 'You were half dead on Clark Street. Sit. Drink something.', {
+        npc('almoner', 'Sister Adel of the Vigil', VIGIL, at(6, 25), 'You were half dead on Clark Street. Sit. Drink something.', {
           faction: 'vigil',
           timid: true,
           wanderRadius: 4,
           hp: 8,
         }),
-        npc('waterbearer', 'Brother Cass of the Vigil', VIGIL, at(12, 36), 'The cistern is under the stands. Two cups a day, and nobody is turned away.', {
+        npc('waterbearer', 'Brother Cass of the Vigil', VIGIL, at(9, 27), 'The cistern is under the stands. Two cups a day, and nobody is turned away.', {
           faction: 'vigil',
           timid: true,
           wanderRadius: 5,
           hp: 8,
         }),
-        npc('vigil-warden', 'Warden Iyabo of the Vigil', VIGIL, at(6, 30), 'The Wake come over the left-field wall. We mend it, they come again.', {
+        npc('vigil-warden', 'Warden Iyabo of the Vigil', VIGIL, at(5, 22), 'The Wake come over the left-field wall. We mend it, they come again.', {
           faction: 'vigil',
           weapon: 'pipeWrench',
           wanderRadius: 6,
           hp: 14,
         }),
 
-        npc('shopkeeper', 'Maren of the Reclamation', RECLAMATION, at(24, 36), 'Reclamation post, under the stands. If it was made before, I will buy it.', {
+        npc('shopkeeper', 'Maren of the Reclamation', RECLAMATION, at(18, 27), 'Reclamation post, under the stands. If it was made before, I will buy it.', {
           shopId: 'reclamationPost',
           faction: 'reclamation',
           weapon: 'pipeWrench',
           hp: 14,
         }),
-        npc('scrapper-eli', 'Eli, sorting scrap', RECLAMATION, at(28, 34), 'Everything in this park has been stripped twice. I am on the third pass.', {
+        npc('scrapper-eli', 'Eli, sorting scrap', RECLAMATION, at(21, 25), 'Everything in this park has been stripped twice. I am on the third pass.', {
           faction: 'reclamation',
           weapon: 'pipeWrench',
           wanderRadius: 3,
         }),
 
-        npc('settler-hana', 'Hana, mending the wall', SETTLER, at(20, 12), 'Left field. They always come over left field.', {
+        npc('settler-hana', 'Hana, mending the wall', SETTLER, at(15, 9), 'Left field. They always come over left field.', {
           faction: 'settlers',
           wanderRadius: 4,
         }),
-        npc('settler-rook', 'Rook, boiling water', SETTLER, at(16, 30), 'You want the tunnels, the station is east on Addison. Go with somebody.', {
+        npc('settler-rook', 'Rook, boiling water', SETTLER, at(12, 22), 'You want the tunnels, the station is east on Addison. Go with somebody.', {
           faction: 'settlers',
           wanderRadius: 3,
         }),
-        npc('settler-child', 'a child, throwing stones', SETTLER, at(22, 24), 'It used to be a ball park. My gran says there were forty thousand people.', {
+        npc('settler-child', 'a child, throwing stones', SETTLER, at(16, 18), 'It used to be a ball park. My gran says there were forty thousand people.', {
           faction: 'settlers',
           timid: true,
           wanderRadius: 8,
@@ -146,8 +162,8 @@ export const WRIGLEY_FIELD: LandmarkDef = {
       ],
 
       groundItems: [
-        { item: createItem('medPack', 1), x: origin.x + 10, y: origin.y + 35 },
-        { item: createItem('machete'), x: origin.x + 30, y: origin.y + 20 },
+        { item: createItem('medPack', 1), x: origin.x + 8, y: origin.y + 26 },
+        { item: createItem('machete'), x: origin.x + 22, y: origin.y + 15 },
       ],
     };
   },

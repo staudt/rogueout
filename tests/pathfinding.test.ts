@@ -245,7 +245,13 @@ describe('no single body can hold the way to a landmark', () => {
 
     expect(region.transitions.length).toBeGreaterThan(0);
 
-    for (const target of region.transitions) {
+    // The transitions, plus the street outside the settlement. The station transition already
+    // forces a route out through the gates, so the extra target is belt and braces — but it states
+    // the property directly instead of leaving it as a side effect of where the station happens to
+    // sit, which is what would quietly stop holding if a later area put every transition indoors.
+    const outside = { x: WRIGLEYVILLE.entry.x, y: WRIGLEYVILLE.entry.y + 6, toRegion: 'the street' };
+
+    for (const target of [...region.transitions, outside]) {
       const route = findPath(entry, target, grid);
       expect(route, `no route at all to ${target.toRegion}`).not.toBeNull();
 

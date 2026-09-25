@@ -23,8 +23,14 @@ export const TILES: Record<string, TileDef> = {
   // The city (world/generation/city/*). Backgrounds are solid, like the outdoor terrain below:
   // a city drawn as bare glyphs on black reads as a wireframe maze rather than as streets between
   // buildings, which is the same lesson the sand background taught.
-  /** Asphalt. The city's open ground, and the thing blocks are the complement of. */
+  /** Asphalt. The roadway itself, three tiles of it between the kerbs. */
   street: { id: 'street', glyph: '.', fg: '#75757c', bg: '#14141a', walkable: true, opaque: false },
+  /**
+   * The pavement either side of the road. Same glyph as the street, a paler and warmer colour —
+   * concrete against asphalt. It carries no mechanics: it exists so a street reads as a street
+   * with edges rather than as a five-tile band of undifferentiated grey.
+   */
+  sidewalk: { id: 'sidewalk', glyph: '.', fg: '#a09a8c', bg: '#1e1d19', walkable: true, opaque: false },
   /** An intact building exterior. */
   brick: { id: 'brick', glyph: '#', fg: '#95503d', bg: '#231310', walkable: false, opaque: true },
   /**
@@ -52,6 +58,14 @@ export const TILES: Record<string, TileDef> = {
    */
   path: { id: 'path', glyph: '.', fg: '#cdbb92', bg: '#1f1810', walkable: true, opaque: false },
   water: { id: 'water', glyph: '~', fg: '#3f7fbf', bg: '#06101a', walkable: false, opaque: false },
+  /**
+   * Standing muck and reeds: walkable, unlike the water it fringes.
+   *
+   * Sharing the `"` glyph with grass is safe precisely because both are walkable — the colour
+   * distinguishes them and nothing rests on telling them apart at a glance. It would not be safe
+   * to share a glyph across a passability difference, which is why the moat's barrier is `water`.
+   */
+  swamp: { id: 'swamp', glyph: '"', fg: '#6f8250', bg: '#101609', walkable: true, opaque: false },
   rock: { id: 'rock', glyph: '*', fg: '#7a7a7a', bg: '#121212', walkable: false, opaque: true },
   tree: { id: 'tree', glyph: 'T', fg: '#2f7d32', bg: '#0c1408', walkable: false, opaque: true },
 };

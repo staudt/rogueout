@@ -42,16 +42,23 @@ export interface RuinOptions {
  * Between them the finished map is connected *by construction*, rather than by a repair pass that
  * hopes to catch whatever went wrong.
  */
+/**
+ * The damage field, without the boundary bias. Exported because the block-texture decision — has
+ * this block come down into cave, or is it still buildings? — has to read the *same* field, or the
+ * two would disagree and caves would appear in the middle of intact frontage.
+ */
+export function blockDamage(x: number, y: number, seed: number, decay: number): number {
+  return Math.min(1, fbm2D(seed, x * NOISE_SCALE, y * NOISE_SCALE, DAMAGE_NOISE) + decay);
+}
+
 export function applyRuin(
   canvas: CityCanvas,
   footprints: Rect[],
   graph: StreetGraph,
   options: RuinOptions,
 ): void {
-  const damageAt = (x: number, y: number): number => {
-    const base = fbm2D(options.seed, x * NOISE_SCALE, y * NOISE_SCALE, DAMAGE_NOISE);
-    return Math.min(1, base + options.decay + boundaryBias(x, y, options.boundaries));
-  };
+  const damageAt = (x: number, y: number): number =>
+    Math.min(1, blockDamage(x, y, options.seed, options.decay) + boundaryBias(x, y, options.boundaries));
 
   for (const footprint of footprints) {
     const cx = (footprint.x0 + footprint.x1) / 2;
