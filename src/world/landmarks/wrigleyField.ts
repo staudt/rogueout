@@ -1,4 +1,5 @@
 import type { Point } from '../../utils/geometry';
+import { fbm2D } from '../generation/noise';
 import { createNpc } from '../../entities/Npc';
 import { createItem } from '../../items/Item';
 import type { LandmarkDef } from './LandmarkRegistry';
@@ -52,7 +53,57 @@ function bandAt(x: number, y: number): string {
   if (depth === 0) return 'brick'; // the outer wall, all the way round
   if (depth <= 2) return 'floor'; // concourse
   if (depth <= 5) return 'rubble'; // grandstand, come down
-  return 'grass'; // the field — the only green for miles, and it should read that way
+  return 'grass'; // the field
+}
+
+/**
+ * The mess on top of the bands: debris across the field, weeds through everything, the odd fallen
+ * chunk of the upper deck.
+ *
+ * The first version of the park was too tidy — clean concentric rings, an unbroken green field —
+ * and read as a stadium somebody was still maintaining rather than one a few dozen people are
+ * camping in. Noise rather than randomness so the park is the **same place every game**, which is
+ * what "authored landmark" has to mean if a player is ever to know their way around it.
+ *
+ * **Blockers are kept rare and off the anchors.** The field wants to look wrecked, not to become
+ * an obstacle course: you should be able to cross it in a straight line nearly anywhere.
+ */
+const MESS_SEED = 90210;
+const MESS_SCALE = 0.19;
+const DEBRIS_SCALE = 0.47;
+
+function messAt(x: number, y: number, band: string): string {
+  const mess = fbm2D(MESS_SEED, x * MESS_SCALE, y * MESS_SCALE, { octaves: 3, persistence: 0.55 });
+  const debris = fbm2D(MESS_SEED + 7, x * DEBRIS_SCALE, y * DEBRIS_SCALE, { octaves: 2 });
+
+  // A fallen piece of the stands. Rare, and never where something has to stand or be reached.
+  if (debris > 0.84 && !nearAnchor(x, y)) return 'ruin';
+
+  if (band === 'grass') {
+    if (mess > 0.64) return 'rubble'; // debris thrown out across the outfield
+    if (mess > 0.46) return 'weeds'; // and the rest going over
+    return 'grass';
+  }
+
+  if (band === 'floor') {
+    if (mess > 0.66) return 'rubble';
+    if (mess > 0.58) return 'weeds';
+    return 'floor';
+  }
+
+  if (band === 'rubble' && mess > 0.60) return 'weeds';
+  return band;
+}
+
+/** Tiles that must stay clear: the gates, the spawn, the clubhouse door and their surroundings. */
+function nearAnchor(x: number, y: number): boolean {
+  const keep = [
+    WRIGLEY_SPAWN,
+    WRIGLEY_CLUBHOUSE_DOOR,
+    ...WRIGLEY_GATE_XS.map((gx) => ({ x: gx, y: WRIGLEY_SIZE - 1 })),
+    { x: 15, y: 15 },
+  ];
+  return keep.some((point) => Math.max(Math.abs(point.x - x), Math.abs(point.y - y)) <= 2);
 }
 
 export const WRIGLEY_FIELD: LandmarkDef = {
@@ -64,7 +115,8 @@ export const WRIGLEY_FIELD: LandmarkDef = {
   stamp: (put) => {
     for (let y = 0; y < WRIGLEY_SIZE; y++) {
       for (let x = 0; x < WRIGLEY_SIZE; x++) {
-        put(x, y, bandAt(x, y));
+        const band = bandAt(x, y);
+        put(x, y, band === 'brick' ? band : messAt(x, y, band));
       }
     }
 

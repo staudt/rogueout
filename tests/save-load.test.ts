@@ -105,7 +105,7 @@ describe('save/load round trip', () => {
     const storage = createMemoryStorage();
     const { state } = makeRun();
     for (let i = 0; i < 5; i++) state.player.inventory.push(createItem('medPack'));
-    state.regions['wrigleyville']!.monsters.push(createMonster(MONSTERS['dustRat']!, 25, 10));
+    state.regions['wrigleyville']!.monsters.push(createMonster(MONSTERS['alleyRat']!, 25, 10));
 
     saveGame(storage, state);
     const loaded = loadGame(storage)!;
@@ -114,7 +114,7 @@ describe('save/load round trip', () => {
     expect(loadedItemIds.has(createItem('machete').id)).toBe(false);
 
     const loadedMonsterIds = new Set(loaded.regions['wrigleyville']!.monsters.map((m) => m.id));
-    expect(loadedMonsterIds.has(createMonster(MONSTERS['dustRat']!, 1, 1).id)).toBe(false);
+    expect(loadedMonsterIds.has(createMonster(MONSTERS['alleyRat']!, 1, 1).id)).toBe(false);
   });
 });
 
@@ -261,5 +261,72 @@ describe('storage failures', () => {
 
     expect(() => saveGame(storage, state)).not.toThrow();
     expect(saveGame(storage, state)).toBe(false);
+  });
+});
+
+describe('creatures are stored as a species plus a history', () => {
+  /**
+   * A creature used to be written out in full — glyph, colour, AC, damage packets, resistances,
+   * tags, behaviour, speed, weight — all of it a verbatim copy of `MONSTERS[defId]`. At 387 bytes
+   * each that was 33 KB of a 63 KB save once the city was properly populated, more than the map.
+   * Only what has actually happened to an individual belongs in a save.
+   */
+  it('writes only what differs from the definition', () => {
+    const { state } = makeRun();
+    const storage = createMemoryStorage();
+    saveGame(storage, state);
+
+    const saved = JSON.parse(storage.read()!);
+    const monsters = saved.regions[state.activeRegionId].monsters as Array<Record<string, unknown>>;
+    expect(monsters.length).toBeGreaterThan(0);
+
+    for (const monster of monsters) {
+      // The species owns all of these; storing them again is the thing this guards against.
+      for (const derived of ['glyph', 'fg', 'ac', 'damage', 'tags', 'resistances', 'maxHp', 'weight', 'behavior']) {
+        expect(monster[derived], `${derived} should come from the bestiary, not the save`).toBeUndefined();
+      }
+      expect(typeof monster['defId']).toBe('string');
+    }
+
+    // Comfortably under the 387 bytes an entity-per-creature save cost.
+    expect(JSON.stringify(monsters).length / monsters.length).toBeLessThan(150);
+  });
+
+  it('rebuilds them with their species intact', () => {
+    const { state } = makeRun();
+    const storage = createMemoryStorage();
+    const before = state.regions[state.activeRegionId]!.monsters[0]!;
+    before.hp = 3;
+    before.provokedBy.push('player');
+
+    saveGame(storage, state);
+    const after = loadGame(storage)!.regions[state.activeRegionId]!.monsters.find((m) => m.id === before.id)!;
+
+    expect(after.defId).toBe(before.defId);
+    expect(after.hp).toBe(3); // what happened to it
+    expect(after.provokedBy).toEqual(['player']);
+    expect(after.maxHp).toBe(before.maxHp); // what its species says
+    expect(after.damage).toEqual(before.damage);
+    expect(after.tags).toEqual(before.tags);
+  });
+
+  it('refuses a save naming a species that no longer exists', () => {
+    // The price of not storing the species. A world missing whatever was about to kill you is
+    // worse than a world you have to start again, so the whole save goes rather than the creature.
+    const { state } = makeRun();
+    const storage = createMemoryStorage();
+    saveGame(storage, state);
+
+    const broken = storage.read()!.replace(/"defId":"[a-zA-Z]+"/, '"defId":"cockatrice"');
+    expect(loadGame(createMemoryStorage(broken))).toBeNull();
+  });
+
+  it('rejects a v2 save, whose creatures are the old full-entity shape', () => {
+    const { state } = makeRun();
+    const storage = createMemoryStorage();
+    saveGame(storage, state);
+
+    const v2 = storage.read()!.replace(`"schemaVersion":${SAVE_SCHEMA_VERSION}`, '"schemaVersion":2');
+    expect(loadGame(createMemoryStorage(v2))).toBeNull();
   });
 });

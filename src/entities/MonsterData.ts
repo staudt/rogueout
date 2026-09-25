@@ -47,6 +47,17 @@ export interface MonsterDef {
    */
   cowardly?: boolean;
   /**
+   * Hunts in a group and takes its nerve from it: how many companions it wants within
+   * `PACK_RADIUS` before it will commit.
+   *
+   * This is what "a pack, but less organised than wolves" comes to mechanically. A stray on its
+   * own shadows you and will not close; three of them together come straight in; and thinning the
+   * pack breaks the survivors rather than making them desperate. They aren't coordinating — each
+   * one is separately deciding whether these odds look good — which is exactly the difference
+   * between dogs and a wolf pack.
+   */
+  pack?: number;
+  /**
    * Roughly kilograms. Only knockback reads it: a kicked skink tumbles, a kicked trooper takes
    * one step back, and something heavy enough doesn't move at all. Omitted means human-ish.
    */
@@ -54,70 +65,135 @@ export interface MonsterDef {
 }
 
 /**
- * The early-game bestiary. Each entry is meant to teach one thing, so the table doubles as a
- * difficulty curve: something free, something that ignores you, something your sword is wrong
+ * The bestiary. Each entry is meant to teach one thing or fill one niche, so the table doubles as
+ * a difficulty curve: something free, something that ignores you, something your blade is wrong
  * for, something faster than you, and something that fights back with gear worth taking.
+ *
+ * Everything here belongs in a dead city rather than a desert — the previous list was written for
+ * sand and outlived the setting by a commit.
  */
 export const MONSTERS: Record<string, MonsterDef> = {
-  dustRat: {
-    id: 'dustRat',
+  /** Free, and everywhere. The one you learn the controls on. */
+  alleyRat: {
+    id: 'alleyRat',
     weight: 4,
     cowardly: true,
-    name: 'dust rat',
+    name: 'alley rat',
     glyph: 'r',
-    fg: '#c08552',
-    maxHp: 6,
+    fg: '#9c7b53',
+    maxHp: 5,
     ac: 10,
     strength: 3,
     agility: 6,
     accuracyBonus: 0,
-    damage: [{ type: 'pierce', min: 1, max: 2 }], // teeth
+    damage: [{ type: 'pierce', min: 1, max: 2 }],
     tags: ['living', 'beast', 'head', 'legs'],
     faction: 'predators',
     behavior: 'chase',
     awarenessRadius: 5,
   },
 
-  /** Teaches that not everything out here is a fight. Quick, and runs rather than swings. */
-  sandSkink: {
-    id: 'sandSkink',
-    weight: 3,
-    name: 'sand skink',
-    glyph: 'l',
-    fg: '#d2b48c',
-    maxHp: 4,
-    ac: 13,
-    strength: 1,
-    agility: 9,
+  /** Teaches that the glyph is not the creature: same letter, four times the fight. */
+  bloatedRat: {
+    id: 'bloatedRat',
+    weight: 14,
+    name: 'bloated rat',
+    glyph: 'r',
+    fg: '#b9a7a0',
+    maxHp: 16,
+    ac: 11,
+    strength: 5,
+    agility: 3,
     accuracyBonus: 0,
-    damage: [{ type: 'pierce', min: 1, max: 1 }],
+    damage: [{ type: 'pierce', min: 2, max: 4 }],
     tags: ['living', 'beast', 'head', 'legs'],
-    faction: 'wildlife',
-    speed: 18, // hard to corner
-    behavior: 'flee',
-    awarenessRadius: 7,
+    resist: { rad: 0.5 },
+    faction: 'predators',
+    speed: 9, // heavy and slow: you can walk away from this one
+    behavior: 'chase',
+    awarenessRadius: 6,
   },
 
-  /** The bigger lizard that does hunt you. Fast enough that open ground stops being safe. */
-  duneRunner: {
-    id: 'duneRunner',
-    weight: 45,
-    cowardly: true,
-    name: 'dune runner',
-    glyph: 'L',
-    fg: '#b8860b',
-    maxHp: 14,
+  /** Teaches that not everything out here is a fight. Too quick to corner, and not interested. */
+  feralCat: {
+    id: 'feralCat',
+    weight: 4,
+    name: 'feral cat',
+    glyph: 'f',
+    fg: '#8d8a84',
+    maxHp: 5,
+    ac: 14,
+    strength: 2,
+    agility: 9,
+    accuracyBonus: 0,
+    damage: [{ type: 'cut', min: 1, max: 2 }],
+    tags: ['living', 'beast', 'head', 'legs'],
+    faction: 'wildlife',
+    speed: 20,
+    behavior: 'flee',
+    awarenessRadius: 8,
+  },
+
+  /** Noise with wings. Harmless, and the first thing that tells you something is moving nearby. */
+  carrionCrow: {
+    id: 'carrionCrow',
+    weight: 2,
+    name: 'carrion crow',
+    glyph: 'B',
+    fg: '#5c5a63',
+    maxHp: 3,
+    ac: 14,
+    strength: 1,
+    agility: 8,
+    accuracyBonus: 0,
+    damage: [{ type: 'pierce', min: 1, max: 1 }],
+    tags: ['living', 'beast', 'head'],
+    faction: 'wildlife',
+    speed: 18,
+    behavior: 'flee',
+    awarenessRadius: 9,
+  },
+
+  /**
+   * The pack, and the reason `MonsterDef.pack` exists. One stray keeps its distance; three come
+   * straight in; kill two and the rest remember they are dogs rather than wolves.
+   */
+  strayDog: {
+    id: 'strayDog',
+    weight: 25,
+    pack: 2,
+    name: 'stray dog',
+    glyph: 'd',
+    fg: '#a67c52',
+    maxHp: 11,
     ac: 12,
-    strength: 6,
+    strength: 5,
     agility: 7,
     accuracyBonus: 1,
-    damage: [
-      { type: 'pierce', min: 2, max: 4 },
-      { type: 'cut', min: 1, max: 2 },
-    ],
+    damage: [{ type: 'pierce', min: 2, max: 4 }],
     tags: ['living', 'beast', 'head', 'legs'],
     faction: 'predators',
-    speed: 18,
+    speed: 15, // it closes faster than you retreat
+    behavior: 'chase',
+    awarenessRadius: 9,
+  },
+
+  /** The one that doesn't need the others. Slower than a stray, and much harder to see off. */
+  junkyardDog: {
+    id: 'junkyardDog',
+    weight: 50,
+    name: 'junkyard dog',
+    glyph: 'd',
+    fg: '#6b4f3a',
+    maxHp: 20,
+    ac: 13,
+    strength: 7,
+    agility: 6,
+    accuracyBonus: 2,
+    damage: [{ type: 'pierce', min: 3, max: 6 }],
+    tags: ['living', 'beast', 'head', 'legs'],
+    faction: 'predators',
+    speed: 14,
     behavior: 'chase',
     awarenessRadius: 9,
   },
@@ -126,16 +202,16 @@ export const MONSTERS: Record<string, MonsterDef> = {
    * The first time the damage system bites: a carapace turns blades and points alike, and the
    * answer is the blunt weapon you probably didn't buy.
    */
-  paleScorpion: {
-    id: 'paleScorpion',
-    weight: 15,
-    name: 'pale scorpion',
-    glyph: 's',
-    fg: '#e8e0c0',
-    maxHp: 11,
+  ironRoach: {
+    id: 'ironRoach',
+    weight: 12,
+    name: 'iron roach',
+    glyph: 'a',
+    fg: '#6e5a3c',
+    maxHp: 12,
     ac: 13,
     strength: 4,
-    agility: 4,
+    agility: 5,
     accuracyBonus: 1,
     damage: [
       { type: 'pierce', min: 1, max: 2 },
@@ -229,10 +305,10 @@ export const MONSTERS: Record<string, MonsterDef> = {
    * inside worth puncturing — so a spear is useless against it and fire is devastating. None of
    * that is special-cased anywhere; it all falls out of tags and resistances.
    */
-  crawlingMold: {
-    id: 'crawlingMold',
+  blackMold: {
+    id: 'blackMold',
     weight: 25,
-    name: 'crawling mold',
+    name: 'black mold',
     glyph: 'm',
     fg: '#8bc34a',
     maxHp: 10,

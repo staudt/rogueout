@@ -1,18 +1,23 @@
 import type { GameState, RegionState } from '../engine/GameState';
 import type { Player } from '../entities/Player';
-import type { Monster } from '../entities/Monster';
+import { createMonster, type Monster } from '../entities/Monster';
+import { MONSTERS } from '../entities/MonsterData';
+import type { FactionId } from '../world/Factions';
+import type { Item } from '../items/Item';
 import type { Npc } from '../entities/Npc';
 import type { GroundItem } from '../items/Item';
 import type { RegionTransition } from '../world/regions/RegionTypes';
 import { decodeBits, decodeTiles, encodeBits, encodeTiles, type EncodedTiles } from './MapCodec';
 
 /**
- * v2 encodes the two area-scaled fields (tiles, explored) and drops `visible` — see SavedRegion.
+ * v3 stores creatures as a definition id plus what has actually happened to them, rather than a
+ * full copy of the species (see SavedMonster). v2 encoded the two area-scaled fields (tiles,
+ * explored) and dropped `visible` — see SavedRegion.
  * v1 saves are rejected rather than converted: they predate the move to a city map, the region
  * ids changed with it, and the game is permadeath single-slot, so the cost of refusing one is a
  * new run rather than lost progress.
  */
-export const SAVE_SCHEMA_VERSION = 2;
+export const SAVE_SCHEMA_VERSION = 3;
 
 /** How many trailing log lines a save keeps — enough to remember what you were doing. */
 export const SAVED_MESSAGE_LINES = 50;
@@ -29,6 +34,34 @@ export const SAVED_MESSAGE_LINES = 50;
  *   load before anything can read it, so storing it would be writing down an answer we're about
  *   to recalculate anyway — and it was the single largest field in the file.
  */
+/**
+ * A creature as stored: which species it is, and what has happened to it since.
+ *
+ * Everything else — glyph, colour, AC, damage packets, resistances, tags, behaviour, speed, weight
+ * — is a verbatim copy of `MONSTERS[defId]` and does not belong in a save any more than the tile
+ * grid belonged in it uncompressed. Storing the lot cost **387 bytes a creature**, and once the
+ * city was properly populated that was 33 KB of a 63 KB save, more than the map itself.
+ *
+ * The risk this takes is the honest one: if a species is renamed out of the table, saves naming it
+ * can no longer be rehydrated. They load as null, which is the same answer every other unreadable
+ * save gets, and for a permadeath single-slot game the cost is a new run.
+ */
+export interface SavedMonster {
+  id: string;
+  defId: string;
+  x: number;
+  y: number;
+  hp: number;
+  energy: number;
+  provokedBy: FactionId[];
+  broken?: boolean;
+  patrolIndex?: number;
+  carried?: Item[];
+  investigating?: Monster['investigating'];
+  hasScreamed?: boolean;
+  calledOut?: boolean;
+}
+
 export interface SavedRegion {
   name: string;
   arrival?: string;
@@ -37,10 +70,48 @@ export interface SavedRegion {
   map: { width: number; height: number; tiles: EncodedTiles };
   daylight: boolean;
   patrolRoute?: Array<{ x: number; y: number }>;
-  monsters: Monster[];
+  monsters: SavedMonster[];
   groundItems: GroundItem[];
   npcs: Npc[];
   explored: string;
+}
+
+function toSavedMonster(monster: Monster): SavedMonster {
+  return {
+    id: monster.id,
+    defId: monster.defId,
+    x: monster.x,
+    y: monster.y,
+    hp: monster.hp,
+    energy: monster.energy,
+    provokedBy: monster.provokedBy,
+    ...(monster.broken ? { broken: true } : {}),
+    ...(monster.patrolIndex !== undefined ? { patrolIndex: monster.patrolIndex } : {}),
+    ...(monster.carried?.length ? { carried: monster.carried } : {}),
+    ...(monster.investigating ? { investigating: monster.investigating } : {}),
+    ...(monster.hasScreamed ? { hasScreamed: true } : {}),
+    ...(monster.calledOut ? { calledOut: true } : {}),
+  };
+}
+
+/** Rebuilds a creature from its species plus its history, or null if the species is gone. */
+function fromSavedMonster(saved: SavedMonster): Monster | null {
+  const def = MONSTERS[saved.defId];
+  if (!def) return null;
+
+  // The id is readonly on the entity and has to survive the round trip: inventory, equipment and
+  // targeting all key off it. Built fresh from the species, then given back its own identity.
+  const monster: Monster = { ...createMonster(def, saved.x, saved.y), id: saved.id };
+  monster.hp = saved.hp;
+  monster.energy = saved.energy;
+  monster.provokedBy = saved.provokedBy ?? [];
+  if (saved.broken) monster.broken = true;
+  if (saved.patrolIndex !== undefined) monster.patrolIndex = saved.patrolIndex;
+  if (saved.carried) monster.carried = saved.carried;
+  if (saved.investigating) monster.investigating = saved.investigating;
+  if (saved.hasScreamed) monster.hasScreamed = true;
+  if (saved.calledOut) monster.calledOut = true;
+  return monster;
 }
 
 /**
@@ -79,7 +150,7 @@ export function toSaveData(state: GameState): SaveData {
       },
       daylight: region.daylight,
       ...(region.patrolRoute ? { patrolRoute: region.patrolRoute } : {}),
-      monsters: region.monsters,
+      monsters: region.monsters.map(toSavedMonster),
       groundItems: region.groundItems,
       npcs: region.npcs,
       explored: encodeBits(region.visibility.explored),
@@ -116,6 +187,16 @@ export function fromSaveData(save: SaveData): GameState | null {
     const explored = decodeBits(saved.explored, area);
     if (!explored) return null;
 
+    const monsters: Monster[] = [];
+    for (const savedMonster of saved.monsters) {
+      const monster = fromSavedMonster(savedMonster);
+      // A species renamed out of the bestiary makes the whole save unreadable rather than
+      // silently dropping creatures — a world missing the thing that was about to kill you is
+      // worse than a world you have to start again.
+      if (!monster) return null;
+      monsters.push(monster);
+    }
+
     regions[id] = {
       name: saved.name,
       ...(saved.arrival ? { arrival: saved.arrival } : {}),
@@ -123,7 +204,7 @@ export function fromSaveData(save: SaveData): GameState | null {
       map: { width, height, tiles },
       daylight: saved.daylight,
       ...(saved.patrolRoute ? { patrolRoute: saved.patrolRoute } : {}),
-      monsters: saved.monsters,
+      monsters,
       groundItems: saved.groundItems,
       npcs: saved.npcs,
       // `visible` starts empty and is filled by the recomputeFOV() that loadGame's caller runs

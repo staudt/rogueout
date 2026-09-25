@@ -22,6 +22,15 @@ export const AUTO_TRAVEL_STEP_MS = 90;
  */
 export const AUTOSAVE_TURN_INTERVAL = 10;
 
+/** How close a companion has to be to count toward a pack animal's nerve. See MonsterDef.pack. */
+export const PACK_RADIUS = 7;
+
+/**
+ * The HP fraction at which a pack animal separated from its pack gives up — far higher than
+ * `BADLY_HURT`, because a stray on its own is not brave, it is just hungry.
+ */
+export const ALONE_AND_HURT = 0.85;
+
 /**
  * How far you can see terrain in the open under a hard sun: far enough that the limit is the
  * land itself, not the light. Sight is still blocked by anything opaque — a rock ridge hides what

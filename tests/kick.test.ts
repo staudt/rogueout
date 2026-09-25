@@ -30,8 +30,8 @@ function stateFor(region: RegionState, x = 2, y = 4): GameState {
 
 describe('knockback distance', () => {
   it('scales with weight: light things tumble, people take a step, heavy things stand there', () => {
-    expect(knockbackTiles(3)).toBe(3); // a skink
-    expect(knockbackTiles(15)).toBe(2); // a scorpion
+    expect(knockbackTiles(3)).toBe(3); // a cat
+    expect(knockbackTiles(15)).toBe(2); // a roach
     expect(knockbackTiles(75)).toBe(1); // a raider
     expect(knockbackTiles(400)).toBe(0);
   });
@@ -40,48 +40,48 @@ describe('knockback distance', () => {
 describe('applyKnockback', () => {
   it('shoves a creature the full distance across open ground', () => {
     const region = arena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 5, 4);
-    region.monsters.push(skink);
+    const cat = createMonster(MONSTERS['feralCat']!, 5, 4);
+    region.monsters.push(cat);
 
-    const result = applyKnockback(skink, 'E', 3, stateFor(region), region);
+    const result = applyKnockback(cat, 'E', 3, stateFor(region), region);
 
-    expect([skink.x, skink.y]).toEqual([8, 4]);
+    expect([cat.x, cat.y]).toEqual([8, 4]);
     expect(result).toMatchObject({ moved: 3, collidedWith: null, hitWall: false });
   });
 
   it('stops at a wall instead of leaving the map', () => {
     const region = arena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 17, 4); // one tile from the east wall
-    region.monsters.push(skink);
+    const cat = createMonster(MONSTERS['feralCat']!, 17, 4); // one tile from the east wall
+    region.monsters.push(cat);
 
-    const result = applyKnockback(skink, 'E', 3, stateFor(region), region);
+    const result = applyKnockback(cat, 'E', 3, stateFor(region), region);
 
-    expect(skink.x).toBe(18);
+    expect(cat.x).toBe(18);
     expect(result.hitWall).toBe(true);
     expect(result.moved).toBe(1);
   });
 
   it('stops against another creature, and says who', () => {
     const region = arena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 5, 4);
-    const bystander = createMonster(MONSTERS['dustRat']!, 7, 4);
-    region.monsters.push(skink, bystander);
+    const cat = createMonster(MONSTERS['feralCat']!, 5, 4);
+    const bystander = createMonster(MONSTERS['alleyRat']!, 7, 4);
+    region.monsters.push(cat, bystander);
 
-    const result = applyKnockback(skink, 'E', 3, stateFor(region), region);
+    const result = applyKnockback(cat, 'E', 3, stateFor(region), region);
 
-    expect(skink.x).toBe(6); // stopped adjacent to it
+    expect(cat.x).toBe(6); // stopped adjacent to it
     expect(result.collidedWith).toBe(bystander);
   });
 
   it('never shoves anything onto the player', () => {
     const region = arena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 5, 4);
-    region.monsters.push(skink);
+    const cat = createMonster(MONSTERS['feralCat']!, 5, 4);
+    region.monsters.push(cat);
     const state = stateFor(region, 7, 4); // directly in the flight path
 
-    applyKnockback(skink, 'E', 3, state, region);
+    applyKnockback(cat, 'E', 3, state, region);
 
-    expect(skink.x).toBe(6);
+    expect(cat.x).toBe(6);
     expect([state.player.x, state.player.y]).toEqual([7, 4]);
   });
 });
@@ -91,27 +91,27 @@ describe('kicking a creature', () => {
     // The point of the kick: a blunt answer to something your blade is wrong for, without
     // stopping to change weapons.
     const region = arena();
-    const scorpion = createMonster(MONSTERS['paleScorpion']!, 3, 4);
-    region.monsters.push(scorpion);
+    const roach = createMonster(MONSTERS['ironRoach']!, 3, 4);
+    region.monsters.push(roach);
     const state = stateFor(region);
-    const before = scorpion.hp;
+    const before = roach.hp;
 
-    kickCreature(scorpion, 'E', state, region, createRNG(3));
+    kickCreature(roach, 'E', state, region, createRNG(3));
 
-    expect(scorpion.hp).toBeLessThan(before);
-    expect(scorpion.x).toBeGreaterThan(3); // shoved away
-    expect(state.messageLog.join(' ')).toContain('You kick the pale scorpion.');
+    expect(roach.hp).toBeLessThan(before);
+    expect(roach.x).toBeGreaterThan(3); // shoved away
+    expect(state.messageLog.join(' ')).toContain('You kick the iron roach.');
   });
 
   it('makes an enemy of whatever you kicked', () => {
     const region = arena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 3, 4);
-    region.monsters.push(skink);
+    const cat = createMonster(MONSTERS['feralCat']!, 3, 4);
+    region.monsters.push(cat);
     const state = stateFor(region);
 
-    kickCreature(skink, 'E', state, region, createRNG(1));
+    kickCreature(cat, 'E', state, region, createRNG(1));
 
-    expect(skink.provokedBy).toContain('player');
+    expect(cat.provokedBy).toContain('player');
   });
 
   it('says so when the target is too heavy to move', () => {
@@ -153,7 +153,7 @@ describe('flinging an object', () => {
 
   it('hits the first creature in the way, for the weapon\'s own damage', () => {
     const region = arena();
-    const rat = createMonster(MONSTERS['dustRat']!, 5, 4);
+    const rat = createMonster(MONSTERS['alleyRat']!, 5, 4);
     region.monsters.push(rat);
     const state = stateFor(region);
     const before = rat.hp;
@@ -168,7 +168,7 @@ describe('flinging an object', () => {
 
   it('bounces off something the weapon cannot hurt, and says so', () => {
     const region = arena();
-    const mold = createMonster(MONSTERS['crawlingMold']!, 5, 4); // immune to pierce
+    const mold = createMonster(MONSTERS['blackMold']!, 5, 4); // immune to pierce
     region.monsters.push(mold);
     const state = stateFor(region);
 
@@ -196,7 +196,7 @@ describe('some things are made for throwing and some are not', () => {
     const attempts = 200;
     for (let seed = 0; seed < attempts; seed++) {
       const region = arena();
-      const rat = createMonster(MONSTERS['dustRat']!, 5, 4);
+      const rat = createMonster(MONSTERS['alleyRat']!, 5, 4);
       region.monsters.push(rat);
       const result = flingItem('x', { x: 2, y: 4 }, 'E', 6, undefined, stateFor(region), region, createRNG(seed), throwBonus);
       if (result.struck) hits++;
@@ -218,7 +218,7 @@ describe('some things are made for throwing and some are not', () => {
 
   it('a missed throw sails past and keeps going, rather than stopping in mid-air', () => {
     const region = arena();
-    region.monsters.push(createMonster(MONSTERS['dustRat']!, 4, 4));
+    region.monsters.push(createMonster(MONSTERS['alleyRat']!, 4, 4));
     const state = stateFor(region);
 
     // Hopeless aim: it cannot connect, so it must travel the full range.

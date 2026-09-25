@@ -50,7 +50,7 @@ describe('describing a creature', () => {
 
   it('says what turns your blows and what it fears', () => {
     const r = region();
-    r.monsters.push(createMonster(MONSTERS['crawlingMold']!, 4, 4));
+    r.monsters.push(createMonster(MONSTERS['blackMold']!, 4, 4));
     see(r, 4, 4);
 
     const text = describeTile(state(r), 4, 4).lines.join('\n');
@@ -63,7 +63,7 @@ describe('describing a creature', () => {
 
   it('distinguishes something that will leave you alone', () => {
     const r = region();
-    r.monsters.push(createMonster(MONSTERS['sandSkink']!, 6, 2));
+    r.monsters.push(createMonster(MONSTERS['feralCat']!, 6, 2));
     see(r, 6, 2);
 
     expect(describeTile(state(r), 6, 2).lines[0]).toMatch(/no quarrel/);

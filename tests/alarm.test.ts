@@ -130,7 +130,7 @@ describe('who screams', () => {
   it('people do; animals do not', () => {
     const person = createNpc('p', 'Someone', '@', '#fff', 5, 5, 'hm', { faction: 'restoration' });
     expect(canRaiseAlarm(person)).toBe(true);
-    expect(canRaiseAlarm(createMonster(MONSTERS['dustRat']!, 1, 1))).toBe(false);
+    expect(canRaiseAlarm(createMonster(MONSTERS['alleyRat']!, 1, 1))).toBe(false);
     expect(canRaiseAlarm(createMonster(MONSTERS['wakeRaider']!, 1, 1))).toBe(true);
   });
 

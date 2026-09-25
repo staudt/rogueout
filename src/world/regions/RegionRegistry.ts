@@ -155,9 +155,9 @@ export const REGIONS: Record<string, RegionDef> = {
         const def = MONSTERS[id];
         if (def) monsters.push(createMonster(def, x, y));
       };
-      spawn('dustRat', 8, 3);
-      spawn('paleScorpion', 11, 6); // your blades are the wrong tool for this one
-      spawn('crawlingMold', 4, 2);
+      spawn('bloatedRat', 8, 3);
+      spawn('ironRoach', 11, 6); // your blades are the wrong tool for this one
+      spawn('blackMold', 4, 2);
       return makeRegionState({
         name: 'the service tunnels',
         arrival: 'The stairs end in the dark. Something moves, further in.',

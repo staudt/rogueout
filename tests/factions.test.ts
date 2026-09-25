@@ -85,7 +85,7 @@ describe('monsters fight each other without the player involved', () => {
     const region = openArena();
     const raider = createMonster(MONSTERS['wakeRaider']!, 5, 4); // raiders
     // A Reclamation scavenger: the Wake needs somebody to sell loot to, so they leave it alone.
-    const scavenger = createMonster({ ...MONSTERS['dustRat']!, faction: 'reclamation' }, 6, 4);
+    const scavenger = createMonster({ ...MONSTERS['alleyRat']!, faction: 'reclamation' }, 6, 4);
     region.monsters.push(raider, scavenger);
     const state = arenaState(region, 18, 7);
     const rng = createRNG(2);
@@ -135,40 +135,40 @@ describe('monsters fight each other without the player involved', () => {
 describe('provocation, fleeing and loot', () => {
   it('a skittish animal runs from you rather than fighting', () => {
     const region = openArena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 5, 4);
-    region.monsters.push(skink);
+    const cat = createMonster(MONSTERS['feralCat']!, 5, 4);
+    region.monsters.push(cat);
     const state = arenaState(region, 3, 4);
 
-    const before = chebyshevDistance(skink, state.player);
+    const before = chebyshevDistance(cat, state.player);
     for (let turn = 0; turn < 3; turn++) {
       state.turnCount = turn;
       runMonsterTurns(state, createRNG(turn + 1));
     }
 
-    expect(chebyshevDistance(skink, state.player)).toBeGreaterThan(before);
+    expect(chebyshevDistance(cat, state.player)).toBeGreaterThan(before);
     expect(state.player.hp).toBe(state.player.maxHp);
   });
 
   it('but turns on you once you hit it — neutrality has to be earned', () => {
     const region = openArena();
-    const skink = createMonster(MONSTERS['sandSkink']!, 4, 4);
-    region.monsters.push(skink);
+    const cat = createMonster(MONSTERS['feralCat']!, 4, 4);
+    region.monsters.push(cat);
     const state = arenaState(region, 3, 4);
 
-    skink.provokedBy.push('player'); // what TurnManager records when you swing at it
+    cat.provokedBy.push('player'); // what TurnManager records when you swing at it
 
     for (let turn = 0; turn < 4; turn++) {
       state.turnCount = turn;
       runMonsterTurns(state, createRNG(turn + 1));
     }
 
-    expect(chebyshevDistance(skink, state.player)).toBe(1); // it closed instead of running
+    expect(chebyshevDistance(cat, state.player)).toBe(1); // it closed instead of running
   });
 
   it('provoking one animal does not turn its whole species against you', () => {
     const region = openArena();
-    const angry = createMonster(MONSTERS['sandSkink']!, 5, 4);
-    const calm = createMonster(MONSTERS['sandSkink']!, 5, 6);
+    const angry = createMonster(MONSTERS['feralCat']!, 5, 4);
+    const calm = createMonster(MONSTERS['feralCat']!, 5, 6);
     region.monsters.push(angry, calm);
     angry.provokedBy.push('player');
 
@@ -179,14 +179,14 @@ describe('provocation, fleeing and loot', () => {
   it('people leave their gear behind; animals leave nothing', () => {
     const region = openArena();
     const raider = createMonster(MONSTERS['wakeRaider']!, 5, 4);
-    const lizard = createMonster(MONSTERS['duneRunner']!, 8, 4);
+    const dog = createMonster(MONSTERS['junkyardDog']!, 8, 4);
 
     dropLoot(raider, region, () => 0); // every roll succeeds
     const afterRaider = region.groundItems.length;
-    dropLoot(lizard, region, () => 0);
+    dropLoot(dog, region, () => 0);
 
     expect(afterRaider).toBeGreaterThan(0);
-    expect(region.groundItems.length).toBe(afterRaider); // the lizard added nothing
+    expect(region.groundItems.length).toBe(afterRaider); // the dog added nothing
     for (const ground of region.groundItems) {
       expect(ITEMS[ground.item.defId]).toBeDefined();
       expect([ground.x, ground.y]).toEqual([raider.x, raider.y]);

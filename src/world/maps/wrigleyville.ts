@@ -122,6 +122,11 @@ export const WRIGLEYVILLE: AreaDef = {
     { x0: 0, y0: 0, x1: WIDTH - 1, y1: 4 },
   ],
 
+  // The park and a tile's margin round it: the Vigil keep this clear, and generation respects it.
+  sanctuaries: [
+    { x0: WRIGLEY_ORIGIN.x - 1, y0: WRIGLEY_ORIGIN.y - 1, x1: WRIGLEY_ORIGIN.x + 30, y1: WRIGLEY_ORIGIN.y + 30 },
+  ],
+
   decay: 0.02,
 };
 

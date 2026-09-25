@@ -121,7 +121,7 @@ describe('typed damage', () => {
 describe('the mold case, end to end', () => {
   // The reason tags exist: no special-casing anywhere, just tags and resistances meeting.
   const mold = () => {
-    const def = MONSTERS['crawlingMold']!;
+    const def = MONSTERS['blackMold']!;
     return combatant({
       hp: def.maxHp,
       maxHp: def.maxHp,

@@ -127,7 +127,7 @@ function carveRuin(map: GameMapData, center: Point, rng: RNG): Poi {
     x: center.x,
     y: center.y,
     loot,
-    guard: { defId: rng() < 0.5 ? 'wakeRaider' : 'duneRunner', x: guardSpot.x, y: guardSpot.y },
+    guard: { defId: rng() < 0.5 ? 'wakeRaider' : 'junkyardDog', x: guardSpot.x, y: guardSpot.y },
   };
 }
 

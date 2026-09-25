@@ -15,6 +15,7 @@ import { fillBlock } from './blocks';
 import { fillCave, openCaveMouths } from './caves';
 import { applyFlooding, floodCore, floodFringe } from './flooding';
 import { applyVegetation } from './vegetation';
+import { populate } from './inhabitants';
 import { applyRuin, blockDamage } from './ruin';
 import { StreetGraph } from './StreetGraph';
 
@@ -186,7 +187,16 @@ export function generateCity(area: AreaDef, seed: number): GeneratedCity {
     }
   }
 
-  return { map, ...contents, patrolRoute: patrolAlong(area, map) };
+  // 9. Who lives here. Last of all, on the finished terrain, so creatures land on the ground that
+  //    actually exists rather than on ground a later pass was going to flood or bury.
+  const wildlife = populate(map, rng, area.sanctuaries ?? []);
+
+  return {
+    map,
+    ...contents,
+    monsters: [...contents.monsters, ...wildlife],
+    patrolRoute: patrolAlong(area, map),
+  };
 }
 
 /**

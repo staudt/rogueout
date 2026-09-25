@@ -176,13 +176,13 @@ describe('calling out an enemy', () => {
 
   it('animals do not shout', () => {
     const r = region();
-    const lizard = createMonster(MONSTERS['duneRunner']!, 10, 6);
-    r.monsters.push(lizard);
+    const dog = createMonster(MONSTERS['junkyardDog']!, 10, 6);
+    r.monsters.push(dog);
     const state = stateFor(r);
 
-    callOutEnemy(state, r, lizard, 'player');
+    callOutEnemy(state, r, dog, 'player');
 
-    expect(lizard.calledOut).toBeFalsy();
+    expect(dog.calledOut).toBeFalsy();
     expect(state.messageLog).toEqual([]);
   });
 });
@@ -261,7 +261,7 @@ describe('scavengers', () => {
 
   it('only some things scavenge', () => {
     expect(scavenges(createMonster(MONSTERS['wakeRaider']!, 1, 1))).toBe(true);
-    expect(scavenges(createMonster(MONSTERS['duneRunner']!, 1, 1))).toBe(false);
+    expect(scavenges(createMonster(MONSTERS['junkyardDog']!, 1, 1))).toBe(false);
   });
 });
 

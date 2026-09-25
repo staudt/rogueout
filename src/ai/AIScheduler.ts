@@ -32,7 +32,9 @@ import {
 import { narrateDistantFighting } from '../narrative/Shouts';
 import { hearsFighting } from './Hearing';
 import {
+  ALONE_AND_HURT,
   DETOUR_NODE_BUDGET,
+  PACK_RADIUS,
   MAX_ACTIONS_PER_TURN,
   NORMAL_SPEED,
   SCAVENGE_RADIUS,
@@ -63,7 +65,7 @@ export function runMonsterTurns(state: GameState, rng: RNG): void {
 
     // Said the turn its nerve goes, not every turn it keeps running. Tracked on the creature so
     // it survives a save and doesn't outlive the run in module state.
-    if (!monster.broken && isBroken(monster)) {
+    if (!monster.broken && isBroken(monster, region)) {
       monster.broken = true;
       if (canSpot(state, monster.x, monster.y)) {
         addMessage(state, `${actorLabel(monster)} breaks and runs.`.replace(/^./, (c) => c.toUpperCase()));
@@ -93,7 +95,7 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
   // A body on the ground is evidence, and it keeps: a killing done in private is still findable.
   noticeCorpses(state, region, actor);
 
-  const behavior = effectiveBehavior(actor);
+  const behavior = effectiveBehavior(actor, region);
 
   if (behavior === 'flee') {
     const threat = actor.provokedBy.length > 0 ? findTarget(actor, state, region) : nearestOther(actor, state, region);
@@ -169,16 +171,44 @@ function takeAction(actor: Provokable, state: GameState, region: RegionState, rn
  * data (`MonsterDef.cowardly`) — the Wake break and run, Restoration troopers don't, and the
  * feral don't know how.
  */
-function effectiveBehavior(actor: Provokable): 'wander' | 'chase' | 'flee' {
+function effectiveBehavior(actor: Provokable, region: RegionState): 'wander' | 'chase' | 'flee' {
   if (actor.kind === 'npc' && actor.timid) return actor.provokedBy.length > 0 ? 'flee' : 'wander';
-  if (isBroken(actor)) return 'flee';
+  if (isBroken(actor, region)) return 'flee';
   if (actor.provokedBy.length > 0) return 'chase';
+
+  // A pack animal that hasn't got its pack around it hangs back rather than committing. A lone
+  // stray shadowing you and a pack of four coming straight in are the same creature, and the
+  // difference between them is arithmetic it does for itself — nothing here coordinates anything.
+  if (actor.kind === 'monster' && actor.behavior === 'chase' && !hasItsPack(actor, region)) {
+    return 'wander';
+  }
+
   return actor.kind === 'monster' ? actor.behavior : 'wander';
 }
 
-function isBroken(actor: Provokable): boolean {
+/** Companions of the same kind close enough to be worth counting. */
+function hasItsPack(monster: Monster, region: RegionState): boolean {
+  const needed = MONSTERS[monster.defId]?.pack;
+  if (!needed) return true; // not a pack animal; its nerve is its own business
+
+  let nearby = 0;
+  for (const other of region.monsters) {
+    if (other === monster || other.hp <= 0 || other.defId !== monster.defId) continue;
+    if (chebyshevDistance(monster, other) <= PACK_RADIUS && ++nearby >= needed) return true;
+  }
+  return false;
+}
+
+function isBroken(actor: Provokable, region: RegionState): boolean {
   if (actor.kind !== 'monster') return false;
-  if (!MONSTERS[actor.defId]?.cowardly) return false;
+  const def = MONSTERS[actor.defId];
+  if (!def) return false;
+
+  // Thinning a pack breaks the survivors rather than making them desperate: once its companions
+  // are gone, a stray's nerve goes long before its health does.
+  if (def.pack && !hasItsPack(actor, region)) return actor.hp / actor.maxHp <= ALONE_AND_HURT;
+
+  if (!def.cowardly) return false;
   return actor.hp / actor.maxHp <= BADLY_HURT;
 }
 

@@ -61,6 +61,12 @@ export interface AreaDef {
    * and then protected, since a defence is only a defence where its builders put it.
    */
   water?: Rect[];
+  /**
+   * Places wildlife is not scattered into — the settlement, chiefly. A ball park with rats
+   * wandering its concourse is not a refuge, and the one place the player is meant to be safe
+   * should not be generated into danger. What walks in afterwards is another matter.
+   */
+  sanctuaries?: Rect[];
   /** How ruined the area is overall, 0..1. Higher buries more of it. */
   decay?: number;
 }
