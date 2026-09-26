@@ -395,6 +395,16 @@ Rules worth knowing:
   - **Thrown and kicked objects are drawn crossing the tiles they cross** (`FlingResult.path`, `Renderer.setMissile`, `MISSILE_STEP_MS = 45`). Cosmetic and deliberately after the fact — resolution has already happened, so the animation cannot change an outcome. It is drawn only where `canSpot` allows, so a throw into the dark doesn't draw a glowing dart across ground the player can't see.
   - **The fourth report — "a miss doesn't seem to be considered against the creature behind" — turned out to be already correct**, and I checked rather than assumed: a rigged miss sails past the first creature and rolls against the next, which a probe confirmed before anything was changed. What was missing was any way to *tell*. The log read "It sails past the alley rat. It hits the alley rat." — two different rats with the same name and nothing visible in the air. **The animation is the actual fix for that report**, and the behaviour is now pinned by a test so it stays true.
   - Verified by 4 new tests plus the browser: the dart menu, two rats lined up, a hit on the first for 2 damage and the dart landing on its tile, with three distinct frames drawn mid-flight. Each of the three behaviour changes was also checked by reverting it and confirming the matching test fails — 378 tests.
+- **Firearms** (`combat/Ranged.ts`, `combat/Projectile.ts`), taken out of order because the throw work had already paid for most of it.
+  - **None of the cost is in the damage.** A gun that is simply a worse sword is not a decision. All three costs are real: every shot burns a round you may not replace, every shot can **jam** and leave you holding a stick for the turn, and every shot is heard **far beyond what you can see** (`noiseRadius` 40-64 against a 24-tile shout and ~14-tile spotting), so firing at something visible is how you summon what isn't. A jam eats the turn but **not the round** — the cartridge is still in there.
+  - **`Projectile.ts` is shared by throwing and firing**, because the rule that matters is easy to get subtly wrong in one place only: **a miss keeps going.** A shot that sails past a rat must be rolled again against whatever is behind it, or a crowd becomes a wall of immunity. `flingItem` was refactored onto it rather than firing reimplementing it.
+  - **`lineOfFire` stops at the first *opaque* tile, not the first unwalkable one** — which is the right distinction and falls out for free: a thrown bottle drops at the edge of a pool, a bullet carries over it.
+  - **Targeting reuses the `;` look cursor** rather than inventing a second way to point at the map. `f` puts it on the nearest enemy, Tab steps through the rest, the arrows move it anywhere, and the line the shot would take is drawn as you aim.
+  - **Tab cycles only things that already want you dead — a fix for a trap I built and then hit.** The first version stepped through everything with a clear line, and two presses put the cursor on a Vigil brother standing down the street; one more and you have shot a friend from a key that felt like browsing. You can still aim at anyone with the arrows, which is the same rule bumping follows: **starting a fight with someone peaceful takes deliberate input, never a convenience key.**
+  - **`raiseNoise` is new and distinct from `raiseAlarm`**: a scream carries blame and its listeners take sides on the strength of it, while a gunshot says only that something happened over there. `Investigation.offender`/`victimFaction` became optional, and `resolveInvestigation` already handled the blameless case correctly — they go, look, find nothing to form a view about, and get on with their day.
+  - Content: `scrapPistol`, `pipeRifle`, `scattergun`, and `looseRound`/`shotShell` (a new `ammo` category). The Restoration is the only faction issuing firearms and not many of them, which is most of what makes them worth the risk of robbing; the Wake carry the odd shell and nothing to fire it with, which is exactly their problem. Maren sells a pistol at a price and **not nearly enough ammunition to feed it** — the scarce thing is the rounds, and that should be visible on the shelf.
+  - **A testing trap worth remembering**: the first draw of a shot is the jam check, which a *low* roll fails, and every draw after it is a to-hit, which a low roll passes. They are opposites, so a naive "always roll low" fake RNG jams every single time. It caught me out writing the tests and is now stated in them.
+  - Verified by `tests/ranged.test.ts` (11 tests) — 389 total — plus a browser run: four shots gave one jam (ammo correctly unspent), one miss, one kill, ammunition 6 -> 3, and **20 creatures converging on the report**. An earlier run of the same script produced the design working better than intended: a shot went wide of a rat, hit Brother Cass of the Vigil standing behind it, and he shouted for help.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).
@@ -447,10 +457,12 @@ dog) and **the feral** (ghouls, hostile to everything with a pulse).
 4. **Classes as starting kits, not cages.** A class sets opening SPECIAL tilt, starting skill
    weights and gear; everything after is use-based. Elder Scrolls' model — identity without a cage.
    Needs a character-creation screen, which `ScreenManager` already supports.
-5. **Firearms.** Deliberately last: the expensive part is ranged targeting (line of fire, target
-   selection), not the gun. Design intent is *unreliable, loud, ammo-starved* rather than weak —
-   improvised ammunition (teeth, salt), jams and misfires, noise that draws attention. Weak-and-safe
-   is just a worse sword; strong-and-risky is a decision. `f` is already stubbed.
+5. ~~**Firearms.**~~ — done, and built out of order. It was filed last because the expensive part
+   is ranged targeting rather than the gun; by the time it came up, the throw animation had already
+   produced the flight path and the `;` cursor was most of the targeting. The design intent held:
+   *unreliable, loud, ammo-starved* rather than weak. See the status entry below.
+
+**Still to do from the list: skills (3) and classes (4)** — the game has deep systems and no arc.
 
 Also agreed: a **goal** is wanted (an Amulet-of-Yendor-style direction, not a plot) and quests
 should be **faction objectives, not authored narrative chains** — do a thing, standing shifts,

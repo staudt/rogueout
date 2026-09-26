@@ -14,6 +14,9 @@ const HOSTILE_MARK = '#e05252';
 /** On your side — allies, and pets once those exist. */
 const ALLIED_MARK = '#6fd3a0';
 const MARK_WIDTH = 2;
+/** Where a shot would travel. Dim, because it is a prediction rather than a thing. */
+const FIRE_LINE_COLOR = 'rgba(255, 210, 120, 0.55)';
+
 /** The look cursor: bright and unlike any faction mark, so it reads as UI rather than a creature. */
 const CURSOR_COLOR = '#ffffff';
 import { ITEMS } from '../items/ItemData';
@@ -42,6 +45,14 @@ export class Renderer {
     this.ctx = ctx;
 
     this.resize();
+  }
+
+  /** The tiles a shot would cross, drawn while aiming. */
+  private fireLine: readonly Point[] = [];
+
+  /** Where a shot would go from here, or empty when not aiming. */
+  setFireLine(points: readonly Point[]): void {
+    this.fireLine = points;
   }
 
   /** A thrown object's current position, or null when nothing is in the air. */
@@ -193,6 +204,14 @@ export class Renderer {
       const playerScreen = this.camera.worldToScreen(state.player.x, state.player.y);
       ctx.fillStyle = state.player.fg;
       ctx.fillText(state.player.glyph, playerScreen.x + 2, playerScreen.y + 2);
+    }
+
+    // Where the shot would go. Under the cursor and the missile, over everything else — it is a
+    // statement about the future, so it should not obscure what is actually there.
+    for (const point of this.fireLine) {
+      const screen = this.camera.worldToScreen(point.x, point.y);
+      ctx.fillStyle = FIRE_LINE_COLOR;
+      ctx.fillRect(screen.x + TILE_SIZE / 2 - 2, screen.y + TILE_SIZE / 2 - 2, 4, 4);
     }
 
     // Something in the air. Drawn over everything else because it is, and only for the instant the

@@ -21,7 +21,7 @@ export const HELP_LINES: readonly string[] = [
   '  d                 drop something',
   '  k                 kick (knocks light things back; blunt, whatever you hold)',
   '  F                 attack on purpose, even someone peaceful',
-  '  f                 fire (no ranged weapons yet)',
+  '  f                 fire a ranged weapon (Tab cycles targets)',
   '  > / <             descend / climb a staircase, or go through a door',
   '',
   'SCREENS',

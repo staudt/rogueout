@@ -4,8 +4,7 @@ import { DIRECTION_VECTORS, type Direction, type Point } from '../utils/geometry
 import { isWalkable } from '../world/GameMap';
 import { actorLabel, reactToAttack, removeActor, type Actor, type Provokable } from '../ai/Actors';
 import { rollTypedDamage, type DamagePacket } from './DamageTypes';
-import { computeToHitChance } from './CombatFormulas';
-import { randomInt } from '../utils/RNG';
+import { resolveProjectile } from './Projectile';
 import { DEFAULT_THROW_BONUS } from '../config/constants';
 import { dropLoot } from './Death';
 import type { RNG } from '../utils/RNG';
@@ -164,52 +163,42 @@ export function flingItem(
   throwBonus: number = DEFAULT_THROW_BONUS,
 ): FlingResult {
   const vector = DIRECTION_VECTORS[direction];
-  let landedAt: Point = { x: from.x, y: from.y };
-  const path: Point[] = [];
 
+  // A thrown object stops at anything it can't be *on*, which is not the same as anything it
+  // can't be seen through: it drops at the edge of a pool, where a bullet would carry over it.
+  const path: Point[] = [];
+  let at: Point = { x: from.x, y: from.y };
   for (let step = 0; step < range; step++) {
-    const next: Point = { x: landedAt.x + vector.x, y: landedAt.y + vector.y };
+    const next: Point = { x: at.x + vector.x, y: at.y + vector.y };
     if (!isWalkable(region.map, next.x, next.y)) break;
     path.push(next);
-
-    const occupant = occupantAt(region, next, null);
-    if (occupant) {
-      // Whether it lands depends on what you threw. A knife flies; a machete tumbles past.
-      const chance = computeToHitChance(state.player.agility, throwBonus, occupant.ac);
-      if (randomInt(rng, 1, 100) > chance) {
-        addMessage(state, `It sails past ${actorLabel(occupant)}.`);
-        landedAt = next;
-        continue;
-      }
-
-      const rolled = rollTypedDamage(rng, damage ?? IMPROVISED_DAMAGE, 0, occupant.resistances);
-      occupant.hp = Math.max(0, occupant.hp - rolled.total);
-
-      const label = actorLabel(occupant);
-      addMessage(
-        state,
-        rolled.shrugged ? `It bounces off ${label}.` : `It hits ${label}.`,
-      );
-
-      reactToAttack(state, region, occupant, state.player.faction);
-
-      if (occupant.hp <= 0) {
-        addMessage(state, capitalized(`${label} goes down.`));
-        dropLoot(occupant, region, rng, state.player.faction);
-        removeActor(region, occupant);
-      }
-
-      return { landedAt: next, struck: occupant, path };
-    }
-
-    landedAt = next;
+    at = next;
   }
 
   void defId;
-  return { landedAt, struck: null, path };
+
+  const result = resolveProjectile(
+    {
+      path,
+      from,
+      damage: damage ?? IMPROVISED_DAMAGE,
+      toHitBonus: throwBonus,
+      attackerAgility: state.player.agility,
+      attackerFaction: state.player.faction,
+      messages: {
+        missed: (label) => `It sails past ${label}.`,
+        hit: (label) => `It hits ${label}.`,
+        shrugged: (label) => `It bounces off ${label}.`,
+      },
+    },
+    state,
+    region,
+    rng,
+  );
+
+  return { landedAt: result.landedAt, struck: result.struck, path: result.path };
 }
 
-/** Anyone standing on that tile — creature or person — other than the one being shoved. */
 function occupantAt(region: RegionState, at: Point, exclude: Actor | null): Provokable | null {
   const here = [...region.monsters, ...region.npcs].find(
     (a) => a.hp > 0 && a !== exclude && a.x === at.x && a.y === at.y,

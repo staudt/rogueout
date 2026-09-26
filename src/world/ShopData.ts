@@ -21,6 +21,12 @@ export const SHOPS: Record<string, ShopDef> = {
       { defId: 'dart', price: 3 },
       { defId: 'paddedVest', price: 22 },
       { defId: 'medPack', price: 6 },
+      // Maren will sell you a gun, at a price, and then not nearly enough to feed it. Ammunition
+      // is the scarce thing here, not the weapon — that is the whole shape of firearms in this
+      // world, and it should be visible on the shelf.
+      { defId: 'scrapPistol', price: 70 },
+      { defId: 'looseRound', price: 6 },
+      { defId: 'shotShell', price: 9 },
     ],
   },
 };

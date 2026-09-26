@@ -71,6 +71,8 @@ export interface InputCallbacks {
   onLookMove: (direction: Direction) => void;
   onLookConfirm: () => void;
   onLookCancel: () => void;
+  /** Tab while aiming: step to the next target. */
+  onLookCycle: () => void;
   onMenuUp: () => void;
   onMenuDown: () => void;
   onMenuConfirm: () => void;
@@ -100,6 +102,13 @@ export class InputManager {
       if (event.key === 'Escape') {
         event.preventDefault();
         this.callbacks.onLookCancel();
+        return;
+      }
+      // Tab steps to the next target while aiming. Harmless while merely looking, and the browser
+      // would otherwise walk focus off the canvas.
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        this.callbacks.onLookCycle();
         return;
       }
     }

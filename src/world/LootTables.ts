@@ -22,6 +22,11 @@ export const FACTION_LOOT: Partial<Record<FactionId, readonly LootEntry[]>> = {
     { defId: 'machete', chance: 0.35 },
     { defId: 'paddedVest', chance: 0.3 },
     { defId: 'medPack', chance: 0.3 },
+    // The only faction issuing firearms, and not many of them. A trooper is where a gun comes
+    // from, which is most of what makes the Restoration worth the risk of robbing.
+    { defId: 'scrapPistol', chance: 0.12 },
+    { defId: 'pipeRifle', chance: 0.06 },
+    { defId: 'looseRound', chance: 0.4, quantity: [2, 5] },
     { defId: 'caps', chance: 0.7, quantity: [6, 20] },
   ],
 
@@ -30,6 +35,8 @@ export const FACTION_LOOT: Partial<Record<FactionId, readonly LootEntry[]>> = {
     { defId: 'pipeWrench', chance: 0.3 },
     { defId: 'scrapSpear', chance: 0.2 },
     { defId: 'throwingKnife', chance: 0.2 },
+    // They have the odd shell and nothing to fire it with, which is exactly their problem.
+    { defId: 'shotShell', chance: 0.18, quantity: [1, 3] },
     { defId: 'caps', chance: 0.5, quantity: [2, 10] },
   ],
 

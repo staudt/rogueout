@@ -1,7 +1,8 @@
 import type { DamagePacket, Resistances } from '../combat/DamageTypes';
+import type { RangedProfile } from '../combat/Ranged';
 
 export type ItemSlot = 'weapon' | 'armor';
-export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'currency' | 'corpse';
+export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'currency' | 'corpse' | 'ammo';
 
 export interface ItemDef {
   id: string;
@@ -27,6 +28,11 @@ export interface ItemDef {
    * mostly doesn't. Omitted means the default clumsiness of throwing something not meant for it.
    */
   throwBonus?: number;
+  /**
+   * Present on firearms. See `combat/Ranged.ts` — the design is unreliable, loud and ammo-starved
+   * rather than weak, so none of the cost is in the damage.
+   */
+  ranged?: RangedProfile;
   /** Armour: how much of each damage type it turns. Plate stops a cut far better than a thrust. */
   resist?: Resistances;
   armorValue?: number;
@@ -171,5 +177,86 @@ export const ITEMS: Record<string, ItemDef> = {
     value: 6,
     stackable: true,
     healAmount: 6,
+  },
+
+  /**
+   * The first gun most people find: a length of pipe, a firing pin and hope. Short-ranged and
+   * jams often, but a hit is worth three swings of a machete.
+   */
+  scrapPistol: {
+    id: 'scrapPistol',
+    name: 'scrap pistol',
+    glyph: '/',
+    fg: '#9aa0a6',
+    category: 'weapon',
+    slot: 'weapon',
+    maxDurability: 20,
+    value: 55,
+    stackable: false,
+    attackVerb: 'pistol-whip', // it is a poor club, and that is the point of carrying a knife too
+    accuracyBonus: -1,
+    damage: [{ type: 'bludgeon', min: 1, max: 2 }],
+    throwBonus: -20,
+    ranged: { range: 7, ammo: 'looseRound', accuracyBonus: 4, jamChance: 0.16, noiseRadius: 40 },
+  },
+
+  /** Longer barrel, steadier, still a pipe. The one worth carrying if you can feed it. */
+  pipeRifle: {
+    id: 'pipeRifle',
+    name: 'pipe rifle',
+    glyph: '/',
+    fg: '#b9a389',
+    category: 'weapon',
+    slot: 'weapon',
+    maxDurability: 25,
+    value: 95,
+    stackable: false,
+    attackVerb: 'clout',
+    accuracyBonus: -1,
+    damage: [{ type: 'bludgeon', min: 2, max: 3 }],
+    throwBonus: -25,
+    ranged: { range: 13, ammo: 'looseRound', accuracyBonus: 10, jamChance: 0.10, noiseRadius: 52 },
+  },
+
+  /**
+   * Close range, and it does not miss much. Everything within half a block hears it and comes to
+   * see, which is why it is the worst gun to solve a small problem with.
+   */
+  scattergun: {
+    id: 'scattergun',
+    name: 'scattergun',
+    glyph: '/',
+    fg: '#8c7b6b',
+    category: 'weapon',
+    slot: 'weapon',
+    maxDurability: 22,
+    value: 120,
+    stackable: false,
+    attackVerb: 'clout',
+    accuracyBonus: -2,
+    damage: [{ type: 'bludgeon', min: 2, max: 4 }],
+    throwBonus: -30,
+    ranged: { range: 5, ammo: 'shotShell', accuracyBonus: 18, jamChance: 0.20, noiseRadius: 64 },
+  },
+
+  /** Hand-loaded, and never enough of it. */
+  looseRound: {
+    id: 'looseRound',
+    name: 'loose round',
+    glyph: '*',
+    fg: '#c8a13a',
+    category: 'ammo',
+    value: 4,
+    stackable: true,
+  },
+
+  shotShell: {
+    id: 'shotShell',
+    name: 'shot shell',
+    glyph: '*',
+    fg: '#b04a3a',
+    category: 'ammo',
+    value: 7,
+    stackable: true,
   },
 };

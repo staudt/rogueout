@@ -239,10 +239,29 @@ export function resolveInvestigation(actor: Provokable): boolean {
 export interface Investigation {
   x: number;
   y: number;
-  /** Whose fault it was. */
-  offender: FactionId;
-  /** Who was on the receiving end. */
-  victimFaction: FactionId;
+  /**
+   * Whose fault it was, and who was on the receiving end — both absent for a noise with nobody to
+   * blame, such as a gunshot. `resolveInvestigation` already treats that case correctly: they go
+   * and look, find nothing to form a view about, and get on with their day.
+   */
+  offender?: FactionId;
+  victimFaction?: FactionId;
+}
+
+/**
+ * A loud noise that nobody is answerable for. Everyone in earshot goes to look.
+ *
+ * Distinct from `raiseAlarm`, which carries blame: a scream says who did what to whom, and its
+ * listeners take sides on the strength of it. A gunshot says only that something happened over
+ * there — and since firing is heard far beyond the range you can see, shooting at something
+ * visible is how you summon the things that are not.
+ */
+export function raiseNoise(region: RegionState, at: Point, radius: number): void {
+  for (const listener of [...region.monsters, ...region.npcs]) {
+    if (listener.hp <= 0 || listener.investigating) continue;
+    if (!withinEarshot(listener, at, radius)) continue;
+    listener.investigating = { x: at.x, y: at.y };
+  }
 }
 
 /**

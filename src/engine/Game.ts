@@ -9,7 +9,7 @@ import {
 } from '../utils/geometry';
 import { capitalize, joinWithAnd, withArticle } from '../utils/text';
 import { createItem } from '../items/Item';
-import { ITEMS } from '../items/ItemData';
+import { ITEMS, type ItemDef } from '../items/ItemData';
 import { MONSTERS } from '../entities/MonsterData';
 import { addItem, consumeOne, removeItem } from '../items/Inventory';
 import { SHOPS } from '../world/ShopData';
@@ -18,10 +18,11 @@ import { ensureRegionLoaded } from '../world/regions/RegionRegistry';
 import { WRIGLEYVILLE_SPAWN } from '../world/maps/wrigleyville';
 import { isWalkable } from '../world/GameMap';
 import { isExplored } from '../fov/VisibilityState';
-import { actorAt, actorLabel, type Provokable } from '../ai/Actors';
+import { actorAt, actorLabel, wantsPlayerDead, type Provokable } from '../ai/Actors';
 import { findPath, findPathToAny } from '../pathfinding/BFS';
 import { walkableLineToward } from '../pathfinding/StraightLine';
 import { flingItem, kickCreature } from '../combat/Kick';
+import { fireAt, hasLineOfFire, lineOfFire } from '../combat/Ranged';
 import { AutoTravel } from '../pathfinding/AutoTravel';
 import type { GameState, RegionState } from './GameState';
 import { addMessage, canSpot, endMessageGroup, getActiveRegion } from './GameState';
@@ -103,8 +104,10 @@ export class Game {
   private resizeFrameId: number | null = null;
   /** The in-flight throw animation, if one is running. */
   private missileTimerId: number | null = null;
-  /** Where the `;` cursor is, or null when not looking. */
+  /** Where the `;`/`f` cursor is, or null when neither looking nor aiming. */
   private lookCursor: Point | null = null;
+  /** What the cursor is for. Enter describes when looking and shoots when aiming. */
+  private cursorPurpose: 'look' | 'fire' = 'look';
   /** For effects Game resolves itself (kicks, throws) rather than routing through TurnManager. */
   private rng: RNG = createRNG(Date.now());
   private readonly storage: SaveStorage;
@@ -163,6 +166,7 @@ export class Game {
       onLookMove: (direction) => this.moveLookCursor(direction),
       onLookConfirm: () => this.confirmLook(),
       onLookCancel: () => this.endLook('Never mind.'),
+      onLookCycle: () => this.cycleTarget(),
       onMenuUp: () => this.screens.moveSelection(-1),
       onMenuDown: () => this.screens.moveSelection(1),
       onMenuConfirm: () => this.screens.confirmSelection(),
@@ -521,6 +525,7 @@ export class Game {
    */
   private startLook(): void {
     if (this.state.gameOver) return;
+    this.cursorPurpose = 'look';
     this.lookCursor = { x: this.state.player.x, y: this.state.player.y };
     this.input.setLookActive(true);
     this.renderer.setCursor(this.lookCursor);
@@ -539,19 +544,25 @@ export class Game {
       y: Math.max(0, Math.min(region.map.height - 1, this.lookCursor.y + vector.y)),
     };
     this.renderer.setCursor(this.lookCursor);
+    this.updateFireLine();
     this.render();
   }
 
   private confirmLook(): void {
     const cursor = this.lookCursor;
+    const purpose = this.cursorPurpose;
     this.endLook();
-    if (cursor) this.showDescription(cursor);
+    if (!cursor) return;
+    if (purpose === 'fire') this.shootAt(cursor);
+    else this.showDescription(cursor);
   }
 
   private endLook(note?: string): void {
     this.lookCursor = null;
+    this.cursorPurpose = 'look';
     this.input.setLookActive(false);
     this.renderer.setCursor(null);
+    this.renderer.setFireLine([]);
     if (note) addMessage(this.state, note);
     this.render();
   }
@@ -922,9 +933,145 @@ export class Game {
     }
   }
 
+  /**
+   * `f` — aim and shoot.
+   *
+   * The cursor starts on the nearest thing worth shooting rather than on the player, because
+   * that is the shot you meant nine times in ten; Tab steps through the rest, the arrows move it
+   * freely, and the line it would take is drawn as you go. It is the same cursor `;` uses, which
+   * is deliberate — one way to point at something on the map, not two.
+   */
   private fireWeapon(): void {
-    addMessage(this.state, 'You have nothing to fire.');
+    if (this.state.gameOver) return;
+
+    const weapon = this.state.player.equipment.weapon;
+    const def = weapon ? ITEMS[weapon.defId] : undefined;
+    if (!def?.ranged) {
+      addMessage(this.state, 'You have nothing to fire.');
+      this.render();
+      return;
+    }
+
+    if (!this.hasAmmoFor(def.ranged.ammo)) {
+      const ammoName = ITEMS[def.ranged.ammo]?.name ?? 'ammunition';
+      addMessage(this.state, `You are out of ${ammoName}s.`);
+      this.render();
+      return;
+    }
+
+    const targets = this.shootableTargets(def.ranged.range);
+    this.cursorPurpose = 'fire';
+    this.lookCursor = targets[0] ?? { x: this.state.player.x, y: this.state.player.y };
+    this.input.setLookActive(true);
+    this.renderer.setCursor(this.lookCursor);
+    this.updateFireLine();
+
+    addMessage(
+      this.state,
+      targets.length > 1
+        ? 'Fire at what? Tab for the next enemy, Enter to fire, Esc to stop.'
+        : 'Fire at what? Move the cursor and press Enter, Esc to stop.',
+    );
+    endMessageGroup(this.state);
     this.render();
+  }
+
+  /**
+   * What Tab will step through: things that already want you dead, nearest first.
+   *
+   * **Deliberately only the hostiles.** The first version cycled everything with a clear line, and
+   * two presses of Tab put the cursor on a Vigil brother standing down the street — one more press
+   * and you have shot a friend, from a key that felt like browsing. You can still aim at anyone by
+   * driving the cursor there with the arrows, which is the same rule bumping follows: starting a
+   * fight with someone peaceful takes deliberate input, never a convenience key.
+   */
+  private shootableTargets(range: number): Point[] {
+    const region = getActiveRegion(this.state);
+    const player = this.state.player;
+
+    return [...region.monsters, ...region.npcs]
+      .filter((actor) => actor.hp > 0)
+      .filter((actor) => wantsPlayerDead(actor, player.faction))
+      .filter((actor) => canSpot(this.state, actor.x, actor.y))
+      .filter((actor) => hasLineOfFire(player, actor, region.map, range))
+      .sort((a, b) => chebyshevDistance(player, a) - chebyshevDistance(player, b))
+      .map((actor) => ({ x: actor.x, y: actor.y }));
+  }
+
+  private cycleTarget(): void {
+    if (this.cursorPurpose !== 'fire' || !this.lookCursor) return;
+
+    const def = this.equippedRanged();
+    if (!def) return;
+
+    const targets = this.shootableTargets(def.ranged!.range);
+    if (targets.length === 0) return;
+
+    const current = targets.findIndex((t) => t.x === this.lookCursor!.x && t.y === this.lookCursor!.y);
+    this.lookCursor = targets[(current + 1) % targets.length]!;
+    this.renderer.setCursor(this.lookCursor);
+    this.updateFireLine();
+    this.render();
+  }
+
+  private updateFireLine(): void {
+    if (this.cursorPurpose !== 'fire' || !this.lookCursor) {
+      this.renderer.setFireLine([]);
+      return;
+    }
+    const def = this.equippedRanged();
+    if (!def?.ranged) return;
+
+    const region = getActiveRegion(this.state);
+    this.renderer.setFireLine(lineOfFire(this.state.player, this.lookCursor, region.map, def.ranged.range));
+  }
+
+  private equippedRanged(): ItemDef | undefined {
+    const weapon = this.state.player.equipment.weapon;
+    const def = weapon ? ITEMS[weapon.defId] : undefined;
+    return def?.ranged ? def : undefined;
+  }
+
+  private hasAmmoFor(ammoId: string): boolean {
+    return this.state.player.inventory.some((item) => item.defId === ammoId && item.quantity > 0);
+  }
+
+  private shootAt(target: Point): void {
+    const def = this.equippedRanged();
+    if (!def?.ranged) return;
+
+    const region = getActiveRegion(this.state);
+    endMessageGroup(this.state);
+
+    if (!this.hasAmmoFor(def.ranged.ammo)) {
+      addMessage(this.state, 'You are out of ammunition.');
+      this.render();
+      return;
+    }
+
+    const outcome = fireAt(def, def.ranged, target, this.state, region, this.rng);
+
+    if (outcome.kind === 'no-line') {
+      // Costs nothing: you never pulled the trigger, you just couldn't see a way through.
+      addMessage(this.state, 'There is no clear shot that way.');
+      this.render();
+      return;
+    }
+
+    // A jam eats the turn but not the round — the cartridge is still in there, which is why
+    // clearing it is worth a turn of its own rather than being free.
+    if (outcome.kind !== 'jammed') {
+      const ammo = this.state.player.inventory.find((item) => item.defId === def.ranged!.ammo);
+      if (ammo) consumeOne(this.state.player.inventory, ammo.id);
+    }
+
+    this.turnManager.advanceTurn();
+    this.render();
+
+    if (outcome.kind === 'fired') {
+      const ammoDef = ITEMS[def.ranged.ammo];
+      this.animateMissile(outcome.result.path, ammoDef?.glyph ?? '*', ammoDef?.fg ?? '#ffd27a');
+    }
   }
 
   private handleNpcInteraction(npc: Npc): void {
