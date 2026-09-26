@@ -133,6 +133,15 @@ export interface FlingResult {
   landedAt: Point;
   /** Who it hit on the way, if anyone. */
   struck: Provokable | null;
+  /**
+   * Every tile the object passed through, in order, ending where it stopped.
+   *
+   * Resolution happens all at once — the object is already where it ended and the damage is
+   * already done — so this exists purely so the flight can be *drawn* afterwards. Without it a
+   * throw is a line in the log and nothing else, and a shot that sails past one creature into
+   * another reads as one confusing sentence about two things with the same name.
+   */
+  path: Point[];
 }
 
 /**
@@ -156,10 +165,12 @@ export function flingItem(
 ): FlingResult {
   const vector = DIRECTION_VECTORS[direction];
   let landedAt: Point = { x: from.x, y: from.y };
+  const path: Point[] = [];
 
   for (let step = 0; step < range; step++) {
     const next: Point = { x: landedAt.x + vector.x, y: landedAt.y + vector.y };
     if (!isWalkable(region.map, next.x, next.y)) break;
+    path.push(next);
 
     const occupant = occupantAt(region, next, null);
     if (occupant) {
@@ -188,14 +199,14 @@ export function flingItem(
         removeActor(region, occupant);
       }
 
-      return { landedAt: next, struck: occupant };
+      return { landedAt: next, struck: occupant, path };
     }
 
     landedAt = next;
   }
 
   void defId;
-  return { landedAt, struck: null };
+  return { landedAt, struck: null, path };
 }
 
 /** Anyone standing on that tile — creature or person — other than the one being shoved. */

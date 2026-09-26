@@ -10,6 +10,7 @@ import { createRNG } from '../src/utils/RNG';
 import { createGameMap } from '../src/world/GameMap';
 import { createVisibility } from '../src/fov/VisibilityState';
 import { wantsPlayerDead } from '../src/ai/Actors';
+import { runNpcTurns } from '../src/ai/AIScheduler';
 
 /**
  * What walking into somebody does.
@@ -131,5 +132,82 @@ describe('walking into something', () => {
 
     cat.provokedBy.push(state.player.faction);
     expect(wantsPlayerDead(cat, state.player.faction)).toBe(true);
+  });
+});
+
+describe('townspeople going about their day', () => {
+  it('holds still when you are standing next to them, so you can actually talk', () => {
+    // They used to drift every turn, which made walking up to somebody a chase you could not win:
+    // each step toward them was a step they took away, at exactly your speed, forever.
+    const map = createGameMap(30, 20, 'floor');
+    const region: RegionState = {
+      name: 'town',
+      transitions: [],
+      map,
+      daylight: false,
+      monsters: [],
+      groundItems: [],
+      npcs: [],
+      visibility: createVisibility(30, 20),
+    };
+    const maren = createNpc('shopkeeper', 'Maren', '@', '#fff', 11, 10, 'Hello.', {
+      faction: 'reclamation',
+      wanderRadius: 6,
+    });
+    region.npcs.push(maren);
+
+    const state: GameState = {
+      player: createPlayer(10, 10), // adjacent
+      regions: { town: region },
+      activeRegionId: 'town',
+      turnCount: 0,
+      messageLog: [],
+      gameOver: false,
+    };
+
+    const rng = createRNG(3);
+    for (let i = 0; i < 40; i++) runNpcTurns(state, rng);
+
+    expect({ x: maren.x, y: maren.y }).toEqual({ x: 11, y: 10 });
+  });
+
+  it('drifts when left alone, but nothing like every turn', () => {
+    const map = createGameMap(30, 20, 'floor');
+    const region: RegionState = {
+      name: 'town',
+      transitions: [],
+      map,
+      daylight: false,
+      monsters: [],
+      groundItems: [],
+      npcs: [],
+      visibility: createVisibility(30, 20),
+    };
+    const cass = createNpc('waterbearer', 'Cass', '@', '#fff', 20, 10, 'Water.', {
+      faction: 'vigil',
+      wanderRadius: 6,
+    });
+    region.npcs.push(cass);
+
+    const state: GameState = {
+      player: createPlayer(2, 2), // far away, so the hold-still rule isn't what's being measured
+      regions: { town: region },
+      activeRegionId: 'town',
+      turnCount: 0,
+      messageLog: [],
+      gameOver: false,
+    };
+
+    const rng = createRNG(5);
+    let moved = 0;
+    let previous = { x: cass.x, y: cass.y };
+    for (let i = 0; i < 100; i++) {
+      runNpcTurns(state, rng);
+      if (cass.x !== previous.x || cass.y !== previous.y) moved += 1;
+      previous = { x: cass.x, y: cass.y };
+    }
+
+    expect(moved).toBeGreaterThan(0); // still alive, not a statue
+    expect(moved).toBeLessThan(45); // but not stepping every turn the way they used to
   });
 });

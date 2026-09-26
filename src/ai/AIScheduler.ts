@@ -33,6 +33,7 @@ import { narrateDistantFighting } from '../narrative/Shouts';
 import { hearsFighting } from './Hearing';
 import {
   ALONE_AND_HURT,
+  NPC_IDLE_STEP_CHANCE,
   DETOUR_NODE_BUDGET,
   PACK_RADIUS,
   MAX_ACTIONS_PER_TURN,
@@ -351,7 +352,14 @@ function attackPlayer(attacker: Provokable, state: GameState, rng: RNG): void {
   }
 }
 
+/** Whether this thing ever takes a step. A mold strikes what reaches it and follows nothing. */
+function isSessile(actor: Provokable): boolean {
+  return actor.kind === 'monster' && MONSTERS[actor.defId]?.sessile === true;
+}
+
 function moveToward(monster: Provokable, target: Point, state: GameState, region: RegionState): void {
+  if (isSessile(monster)) return;
+
   const dx = Math.sign(target.x - monster.x);
   const dy = Math.sign(target.y - monster.y);
   if (tryMoveMonster(monster, { x: monster.x + dx, y: monster.y + dy }, state, region)) return;
@@ -380,6 +388,7 @@ function passableForMonster(monster: Provokable, state: GameState, region: Regio
 }
 
 function wander(monster: Provokable, state: GameState, region: RegionState, rng: RNG): void {
+  if (isSessile(monster)) return;
   const direction = ALL_DIRECTIONS[randomInt(rng, 0, ALL_DIRECTIONS.length - 1)] ?? 'N';
   tryMoveMonster(monster, addPoints(monster, DIRECTION_VECTORS[direction]), state, region);
 }
@@ -423,6 +432,13 @@ export function runNpcTurns(state: GameState, rng: RNG): void {
 
     const radius = npc.wanderRadius ?? 0;
     if (radius <= 0) continue;
+
+    // Somebody standing next to you has noticed you and waits. Without this, walking up to talk to
+    // a shopkeeper is a chase you cannot win — they drift at exactly your speed, so every step you
+    // take toward them is a step they take away.
+    if (chebyshevDistance(npc, state.player) <= 1) continue;
+
+    if (randomInt(rng, 1, 100) > NPC_IDLE_STEP_CHANCE) continue;
 
     const direction = ALL_DIRECTIONS[randomInt(rng, 0, ALL_DIRECTIONS.length - 1)] ?? 'N';
     const target = addPoints(npc, DIRECTION_VECTORS[direction]);

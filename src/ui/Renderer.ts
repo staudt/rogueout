@@ -30,6 +30,8 @@ export class Renderer {
   private readonly camera: Camera;
   private ratio = 0;
   private cursor: Point | null = null;
+  /** An object mid-flight, drawn for the frames the throw animation holds it there. */
+  private missile: { x: number; y: number; glyph: string; fg: string } | null = null;
 
   constructor(canvas: HTMLCanvasElement, camera: Camera) {
     this.canvas = canvas;
@@ -40,6 +42,11 @@ export class Renderer {
     this.ctx = ctx;
 
     this.resize();
+  }
+
+  /** A thrown object's current position, or null when nothing is in the air. */
+  setMissile(missile: { x: number; y: number; glyph: string; fg: string } | null): void {
+    this.missile = missile;
   }
 
   /** Where the look cursor sits, or null when not looking at anything. */
@@ -186,6 +193,14 @@ export class Renderer {
       const playerScreen = this.camera.worldToScreen(state.player.x, state.player.y);
       ctx.fillStyle = state.player.fg;
       ctx.fillText(state.player.glyph, playerScreen.x + 2, playerScreen.y + 2);
+    }
+
+    // Something in the air. Drawn over everything else because it is, and only for the instant the
+    // animation holds it there — resolution has already happened by the time any of this is shown.
+    if (this.missile) {
+      const screen = this.camera.worldToScreen(this.missile.x, this.missile.y);
+      ctx.fillStyle = this.missile.fg;
+      ctx.fillText(this.missile.glyph, screen.x + 2, screen.y + 2);
     }
 
     if (this.cursor) {

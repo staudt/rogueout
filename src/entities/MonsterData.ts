@@ -58,6 +58,14 @@ export interface MonsterDef {
    */
   pack?: number;
   /**
+   * Rooted. It will strike anything that comes within reach and will never take a step toward it.
+   *
+   * Speed alone could not express this: a very low speed still crawls across the map eventually,
+   * and a speed of zero would stop it defending itself too. A mold is a hazard you walk into, not
+   * something that finds you, and the difference matters — you should be able to leave one alone.
+   */
+  sessile?: boolean;
+  /**
    * Roughly kilograms. Only knockback reads it: a kicked skink tumbles, a kicked trooper takes
    * one step back, and something heavy enough doesn't move at all. Omitted means human-ish.
    */
@@ -320,7 +328,8 @@ export const MONSTERS: Record<string, MonsterDef> = {
     tags: ['living', 'mindless', 'amorphous'],
     resist: { pierce: 1, cut: 0.5, bludgeon: 0.25, fire: -1 },
     faction: 'predators',
-    speed: 4, // barely moves; a hazard you walk into rather than something that finds you
+    sessile: true, // rooted: it strikes what comes to it and never follows
+    speed: 8,
     behavior: 'chase',
     awarenessRadius: 1,
   },

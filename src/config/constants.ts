@@ -15,12 +15,31 @@ export const DIAGONAL_CHORD_WINDOW_MS = 45;
 export const AUTO_TRAVEL_STEP_MS = 90;
 
 /**
+ * How long a thrown object is drawn on each tile it crosses.
+ *
+ * Short enough to read as flight rather than as a second creature crossing the room, long enough
+ * to see where the thing went. NetHack's is comparable. Resolution has already happened by the
+ * time any of it is drawn, so this is cosmetic and cannot change an outcome.
+ */
+export const MISSILE_STEP_MS = 45;
+
+/**
  * Turns between autosaves during ordinary play. A save is a suspend, not a checkpoint, so the
  * only thing at stake in the gap is a few turns of replay after a browser crash — whereas every
  * deliberate way of stopping (the game menu, quitting to title, closing the tab, crossing into a
  * region) flushes immediately, and those are how runs actually end.
  */
 export const AUTOSAVE_TURN_INTERVAL = 10;
+
+/**
+ * How often an idling townsperson actually takes a step.
+ *
+ * They used to drift every single turn, which made them impossible to corner: you would step
+ * toward somebody to talk and they would step away at exactly your speed, every turn, forever.
+ * Standing still most of the time reads as going about your business just as well, and means a
+ * settlement is somewhere you can talk to people rather than a thing you chase.
+ */
+export const NPC_IDLE_STEP_CHANCE = 22;
 
 /** How close a companion has to be to count toward a pack animal's nerve. See MonsterDef.pack. */
 export const PACK_RADIUS = 7;

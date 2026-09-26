@@ -8,6 +8,7 @@ import { createGameMap, setTileId } from '../src/world/GameMap';
 import { ITEMS } from '../src/items/ItemData';
 import type { GameState, RegionState } from '../src/engine/GameState';
 import { createRNG } from '../src/utils/RNG';
+import { chebyshevDistance } from '../src/utils/geometry';
 
 function arena(width = 20, height = 9): RegionState {
   const map = createGameMap(width, height, 'wall');
@@ -227,5 +228,52 @@ describe('some things are made for throwing and some are not', () => {
     expect(result.struck).toBeNull();
     expect(result.landedAt.x).toBe(7);
     expect(state.messageLog.join(' ')).toMatch(/sails past/);
+  });
+});
+
+describe('a throw that misses keeps travelling', () => {
+  /**
+   * Reported as "a miss does not seem to be considered against the creature behind it". The logic
+   * was already right — but you could not *tell*, because the log read "It sails past the alley
+   * rat. It hits the alley rat.", which is two different rats with the same name and no way to see
+   * which was which. The animation is the actual fix for that; this pins the behaviour so it stays
+   * true, and documents that it was never the bug.
+   */
+  it('rolls against the next creature in line, and can hit it', () => {
+    const region = arena();
+    const first = createMonster(MONSTERS['alleyRat']!, 5, 4);
+    const behind = createMonster(MONSTERS['alleyRat']!, 7, 4);
+    region.monsters.push(first, behind);
+    const state = stateFor(region);
+
+    // A certain miss on the first, then rolls low enough to land everything after.
+    const rolls = [1.0, 0.01, 0.01, 0.01, 0.01, 0.01];
+    let next = 0;
+    const rng = () => rolls[Math.min(next++, rolls.length - 1)]!;
+
+    const result = flingItem('dart', { x: 2, y: 4 }, 'E', 8, [{ type: 'pierce', min: 2, max: 3 }], state, region, rng, 20);
+
+    expect(first.hp).toBe(first.maxHp); // sailed past
+    expect(behind.hp).toBeLessThan(behind.maxHp); // and struck the one behind
+    expect(result.struck).toBe(behind);
+  });
+
+  it('reports every tile it crossed, so the flight can be drawn', () => {
+    // The path exists only so the throw can be animated: resolution has already happened by the
+    // time any of it is shown, so this cannot change an outcome — only make one legible.
+    const region = arena();
+    const state = stateFor(region);
+    const rng = () => 0.01;
+
+    const from = { x: 2, y: 4 };
+    const result = flingItem('dart', from, 'E', 4, undefined, state, region, rng, 20);
+
+    expect(result.path.length).toBeGreaterThan(0);
+    expect(result.path.at(-1)).toEqual(result.landedAt);
+    // Contiguous, and starting one tile from the thrower rather than on them.
+    expect(result.path[0]).toEqual({ x: from.x + 1, y: from.y });
+    for (let i = 1; i < result.path.length; i++) {
+      expect(chebyshevDistance(result.path[i - 1]!, result.path[i]!)).toBe(1);
+    }
   });
 });

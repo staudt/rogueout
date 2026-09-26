@@ -143,3 +143,31 @@ describe('pack animals', () => {
     expect(chebyshevDistance(dog!, state.player)).toBeLessThan(before);
   });
 });
+
+describe('things that stay put', () => {
+  it('a mold never takes a step, however long you leave it', () => {
+    // Rooted, and it has to be `sessile` rather than merely slow: a very low speed still crawls
+    // across the map eventually, and a speed of zero would stop it defending itself too.
+    const { state, region } = arena();
+    const mold = createMonster(MONSTERS['blackMold']!, 10, 6);
+    region.monsters.push(mold);
+
+    run(state, 60);
+
+    expect({ x: mold.x, y: mold.y }).toEqual({ x: 10, y: 6 });
+  });
+
+  it('but still strikes whatever comes within reach of it', () => {
+    // The point of being a hazard rather than a hunter: you can walk away from it, and you cannot
+    // stand next to it for free.
+    const { state, region } = arena();
+    const mold = createMonster(MONSTERS['blackMold']!, 21, 6); // right beside the player at 20,6
+    region.monsters.push(mold);
+
+    const before = state.player.hp;
+    run(state, 40);
+
+    expect(state.player.hp).toBeLessThan(before);
+    expect({ x: mold.x, y: mold.y }).toEqual({ x: 21, y: 6 });
+  });
+});

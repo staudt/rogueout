@@ -31,6 +31,7 @@ import { InputManager, type ActionKey } from '../input/InputManager';
 import { MouseInput } from '../input/MouseInput';
 import {
   AUTO_TRAVEL_STEP_MS,
+  MISSILE_STEP_MS,
   AUTOSAVE_TURN_INTERVAL,
   DEFAULT_THROW_BONUS,
   KICK_ACCURACY_PENALTY,
@@ -100,6 +101,8 @@ export class Game {
   /** Guards against pushing the game-over screen more than once for the same death. */
   private gameOverShown = false;
   private resizeFrameId: number | null = null;
+  /** The in-flight throw animation, if one is running. */
+  private missileTimerId: number | null = null;
   /** Where the `;` cursor is, or null when not looking. */
   private lookCursor: Point | null = null;
   /** For effects Game resolves itself (kicks, throws) rather than routing through TurnManager. */
@@ -674,6 +677,11 @@ export class Game {
           (def?.throwBonus ?? DEFAULT_THROW_BONUS) - KICK_ACCURACY_PENALTY,
         );
         region.groundItems.push({ item: ground.item, x: result.landedAt.x, y: result.landedAt.y });
+        this.turnManager.advanceTurn();
+        this.render();
+        // A kicked object flies the same way a thrown one does, and should look like it.
+        if (def) this.animateMissile(result.path, def.glyph, def.fg);
+        return;
       }
       this.turnManager.advanceTurn();
       this.render();
@@ -741,6 +749,45 @@ export class Game {
 
     this.turnManager.advanceTurn();
     this.render();
+    this.animateMissile(result.path, def.glyph, def.fg);
+  }
+
+  /**
+   * Draws a thrown object crossing the tiles it crossed.
+   *
+   * Purely cosmetic and deliberately after the fact: the throw has already resolved, the damage is
+   * done and the messages are written. Showing the flight is what makes a throw legible — without
+   * it, a shot that sails past one creature into another behind it is a single confusing line of
+   * log about two things that may well share a name, and the player has no way to see what
+   * happened. (The behaviour was correct all along; only the feedback was missing.)
+   */
+  private animateMissile(path: readonly Point[], glyph: string, fg: string): void {
+    if (this.missileTimerId !== null) {
+      window.clearTimeout(this.missileTimerId);
+      this.missileTimerId = null;
+    }
+    if (path.length === 0) return;
+
+    let step = 0;
+    const advance = () => {
+      const at = path[step];
+      if (!at) {
+        this.renderer.setMissile(null);
+        this.missileTimerId = null;
+        this.render();
+        return;
+      }
+
+      // Only where the player could actually see it. A throw into the dark shouldn't draw a
+      // glowing dart across ground they cannot see.
+      this.renderer.setMissile(canSpot(this.state, at.x, at.y) ? { ...at, glyph, fg } : null);
+      this.render();
+
+      step += 1;
+      this.missileTimerId = window.setTimeout(advance, MISSILE_STEP_MS);
+    };
+
+    advance();
   }
 
   private dropItem(itemId: string): void {
