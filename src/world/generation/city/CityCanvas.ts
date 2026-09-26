@@ -15,17 +15,44 @@ import type { Rect } from '../Rect';
 export class CityCanvas {
   readonly map: GameMapData;
   private readonly protectedTiles: Uint8Array;
+  private restriction: Uint8Array | null = null;
 
   constructor(map: GameMapData) {
     this.map = map;
     this.protectedTiles = new Uint8Array(map.width * map.height);
   }
 
-  /** Writes a tile unless it's protected or off the map. */
+  /**
+   * Writes a tile unless it's protected, outside the current restriction, or off the map.
+   */
   set(x: number, y: number, tileId: string): void {
     if (!inBounds(this.map, x, y)) return;
-    if (this.protectedTiles[y * this.map.width + x] === 1) return;
+    const index = y * this.map.width + x;
+    if (this.protectedTiles[index] === 1) return;
+    if (this.restriction && this.restriction[index] !== 1) return;
     setTileId(this.map, x, y, tileId);
+  }
+
+  /**
+   * Confines every write to exactly these tiles until `release()`.
+   *
+   * Needed the moment blocks stopped being rectangles. A filler works on a rect — it subdivides
+   * one, it runs automata across one — so given an L-shaped or triangular block it would fill the
+   * *bounding box*, and a diagonal street cutting a block in two was quietly paved over by the
+   * buildings on either side of it. Restricting the writes lets the fillers keep thinking in
+   * rectangles while only the drawn shape actually changes, which is what makes "any shape you
+   * draw" true rather than nearly true.
+   */
+  restrictTo(tiles: readonly { x: number; y: number }[]): void {
+    const mask = new Uint8Array(this.map.width * this.map.height);
+    for (const tile of tiles) {
+      if (inBounds(this.map, tile.x, tile.y)) mask[tile.y * this.map.width + tile.x] = 1;
+    }
+    this.restriction = mask;
+  }
+
+  release(): void {
+    this.restriction = null;
   }
 
   fill(rect: Rect, tileId: string): void {

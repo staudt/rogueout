@@ -4,6 +4,7 @@ import { getActiveRegion } from '../engine/GameState';
 import { MIN_VIEWPORT_COLS, MIN_VIEWPORT_ROWS, TILE_SIZE } from '../config/constants';
 import { getTileId } from '../world/GameMap';
 import { TILES } from '../world/Tile';
+import { isConnectedWall, wallGlyph } from './WallGlyphs';
 import { isExplored, isVisible } from '../fov/VisibilityState';
 import { canSpot } from '../engine/GameState';
 import { standingBetween, type FactionId } from '../world/Factions';
@@ -154,7 +155,8 @@ export class Renderer {
         const explored = visible || isExplored(region.visibility, worldX, worldY);
         if (!explored) continue; // unexplored: leave blank
 
-        const tile = TILES[getTileId(region.map, worldX, worldY)];
+        const tileId = getTileId(region.map, worldX, worldY);
+        const tile = TILES[tileId];
         if (!tile) continue;
 
         const px = sx * TILE_SIZE;
@@ -165,7 +167,12 @@ export class Renderer {
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
         }
         ctx.fillStyle = tile.fg;
-        ctx.fillText(tile.glyph, px + 2, py + 2);
+        // Building frontage joins up into box-drawing; everything else draws its own glyph.
+        ctx.fillText(
+          isConnectedWall(tileId) ? wallGlyph(region.map, worldX, worldY) : tile.glyph,
+          px + 2,
+          py + 2,
+        );
 
         if (!visible) {
           ctx.fillStyle = REMEMBERED_OVERLAY;

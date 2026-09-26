@@ -53,7 +53,12 @@ const GROUP_SPREAD = 3;
  * a refuge, and the one place the player is supposed to be safe should not be generated into
  * danger. Everything else is fair game.
  */
-export function populate(map: GameMapData, rng: RNG, avoid: Rect[] = []): Monster[] {
+export function populate(
+  map: GameMapData,
+  rng: RNG,
+  avoid: Rect[] = [],
+  roadClass?: Uint8Array,
+): Monster[] {
   const eligible = new Map<string, Array<{ x: number; y: number }>>();
 
   for (let y = 0; y < map.height; y++) {
@@ -63,8 +68,18 @@ export function populate(map: GameMapData, rng: RNG, avoid: Rect[] = []): Monste
 
       const tile = getTileId(map, x, y);
       const spots = eligible.get(tile);
-      if (spots) spots.push({ x, y });
-      else eligible.set(tile, [{ x, y }]);
+      const spot = { x, y };
+      if (spots) spots.push(spot);
+      else eligible.set(tile, [spot]);
+
+      // A busy road carries more of everything than a back alley does. Rather than a separate
+      // weighting pass, a tile simply appears in the pool once per class it outranks, so random
+      // sampling favours the arterials on its own — which is what "the small streets are quieter"
+      // comes to when the only thing you can vary is where a creature is put.
+      if (!roadClass) continue;
+      const busyness = roadClass[y * map.width + x] ?? 0;
+      const list = eligible.get(tile)!;
+      for (let extra = 1; extra < busyness; extra++) list.push(spot);
     }
   }
 

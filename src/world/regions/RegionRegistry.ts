@@ -14,11 +14,10 @@ import {
   DUNGEON1_STAIRS_DOWN,
 } from '../maps/dungeonLevel1';
 import { createDungeonLevel2Map, DUNGEON2_SPAWN_FROM_LEVEL1, DUNGEON2_STAIRS_UP } from '../maps/dungeonLevel2';
-import { generateCity } from '../generation/city/generateCity';
+import { generateFromPlan } from '../generation/plan/generateFromPlan';
 import {
   WRIGLEY_CLUBHOUSE_EXIT,
   WRIGLEYVILLE,
-  WRIGLEYVILLE_SEED,
   WRIGLEYVILLE_SPAWN_FROM_TUNNELS,
 } from '../maps/wrigleyville';
 import {
@@ -126,7 +125,7 @@ export const REGIONS: Record<string, RegionDef> = {
   wrigleyville: {
     id: 'wrigleyville',
     createState: () => {
-      const city = generateCity(WRIGLEYVILLE, WRIGLEYVILLE_SEED);
+      const city = generateFromPlan(WRIGLEYVILLE);
       return makeRegionState({
         name: WRIGLEYVILLE.name,
         arrival: WRIGLEYVILLE.arrival,

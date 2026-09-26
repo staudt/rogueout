@@ -24,11 +24,26 @@ const THICKET_SCALE = 0.11;
  * weed and left the roads barely readable as roads.
  */
 const WEEDS_ON_RUIN = 0.42;
-const WEEDS_ON_ROAD = 0.62;
+/**
+ * By how busy the road is. **The more a road is used, the less it grows over** — which is both
+ * what happens and what the map needs: a whole stretch of arterial vanishing under weed stopped
+ * it reading as a street at all, and Clark disappeared for thirty tiles at a run. It also gives
+ * the street hierarchy something visible to be: arterials stay open, alleys go green.
+ */
+const WEEDS_ON_ROAD: Record<number, number> = {
+  1: 0.5, // alley — barely used, and it shows
+  2: 0.66, // ordinary street
+  3: 0.84, // arterial — people walk this one
+};
 /** Above this a thicket has taken hold. Ruins only — see below. */
 const THICKET = 0.56;
 
-export function applyVegetation(canvas: CityCanvas, map: GameMapData, seed: number): void {
+export function applyVegetation(
+  canvas: CityCanvas,
+  map: GameMapData,
+  seed: number,
+  roadClass?: Uint8Array,
+): void {
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
       if (!isWalkable(map, x, y)) continue;
@@ -38,8 +53,11 @@ export function applyVegetation(canvas: CityCanvas, map: GameMapData, seed: numb
       if (here === 'swamp' || here === 'grass') continue;
 
       const onRoad = here === 'street' || here === 'sidewalk';
+      const busyness = roadClass?.[y * map.width + x] ?? 2;
+      const threshold = onRoad ? (WEEDS_ON_ROAD[busyness] ?? 0.66) : WEEDS_ON_RUIN;
+
       const growth = fbm2D(seed + 613, x * GROWTH_SCALE, y * GROWTH_SCALE, GROWTH_NOISE);
-      if (growth < (onRoad ? WEEDS_ON_ROAD : WEEDS_ON_RUIN)) continue;
+      if (growth < threshold) continue;
 
       const thicket = fbm2D(seed + 1229, x * THICKET_SCALE, y * THICKET_SCALE, GROWTH_NOISE);
 

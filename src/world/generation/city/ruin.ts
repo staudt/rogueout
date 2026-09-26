@@ -2,7 +2,15 @@ import { fbm2D } from '../noise';
 import type { Rect } from '../Rect';
 import { rectContains } from '../Rect';
 import type { CityCanvas } from './CityCanvas';
-import type { StreetGraph } from './StreetGraph';
+/**
+ * The little of a street network this pass needs. Areas are drawn now rather than generated from a
+ * lattice, so nothing supplies one — but the shape is kept so that a future *generated* area can
+ * still hand over a network whose connectivity must be preserved while it is damaged.
+ */
+interface StreetNetwork {
+  allSegments(): ReadonlyArray<{ id: number; rect: Rect }>;
+  bury(segmentId: number): boolean;
+}
 
 /**
  * Damage, applied as a field rather than per building, so ruin comes in drifts — a run of blocks
@@ -54,8 +62,13 @@ export function blockDamage(x: number, y: number, seed: number, decay: number): 
 export function applyRuin(
   canvas: CityCanvas,
   footprints: Rect[],
-  graph: StreetGraph,
   options: RuinOptions,
+  /**
+   * Only for areas whose streets the generator laid itself. A **drawn** area has no graph and
+   * passes none: what somebody drew is not damaged at all, which makes the question of whether
+   * burying it would disconnect the map moot.
+   */
+  graph?: StreetNetwork,
 ): void {
   const damageAt = (x: number, y: number): number =>
     Math.min(1, blockDamage(x, y, options.seed, options.decay) + boundaryBias(x, y, options.boundaries));
@@ -77,12 +90,12 @@ export function applyRuin(
     }
   }
 
-  // Streets go last, and only ever through the graph.
-  for (const segment of graph.allSegments()) {
+  // Streets go last, and only ever through the graph — and only where there is one.
+  for (const segment of graph?.allSegments() ?? []) {
     const cx = (segment.rect.x0 + segment.rect.x1) / 2;
     const cy = (segment.rect.y0 + segment.rect.y1) / 2;
     if (damageAt(cx, cy) < BURIED) continue;
-    if (!graph.bury(segment.id)) continue;
+    if (!graph!.bury(segment.id)) continue;
 
     canvas.fill(segment.rect, 'ruin');
   }
