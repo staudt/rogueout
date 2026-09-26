@@ -23,7 +23,8 @@ The full design plan (decisions, algorithms, milestone breakdown) lives at
 
 ## Commands
 
-- `npm run dev` — local dev server with HMR.
+- `npm run dev` — local dev server with HMR. **`/editor.html` on that server is the map editor** —
+  see below.
 - `npm run build` — typecheck (`tsc`) + production build to `dist/`.
 - `npm run preview` — serve the production build locally.
 - `npm test` — run Vitest once. `npm run test:watch` for watch mode.
@@ -419,6 +420,15 @@ Rules worth knowing:
   - **Connected wall glyphs** (`ui/WallGlyphs.ts`): brick frontage joins into `─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼`. Presentation only — the tile is still `brick`. **Deliberately not applied to `ruin`**: box-drawing says "somebody built this to a right angle", which is what an intact wall is and what a collapsed block isn't, and keeping it to buildings sharpens the distinction the map has had the most trouble making legible.
   - Patrol routes are now walked along the busiest road **in walking order** rather than gathered in reading order, which had patrollers jumping back and forth across the map. A diagonal arterial therefore gives a diagonal patrol.
   - Measured: generation ~330 ms, **147 actors at 4.8 ms of AI per turn** against a 90 ms travel step, save 43.3 KB against the 50 KB budget. Verified by `tests/area-plan.test.ts` (18 tests) — 372 total — plus a browser run: Clark reads as a diagonal street, a dog pack closed on the player in red rings, and building frontage draws as joined-up box lines.
+- **A map editor** (`/editor.html` under `npm run dev`; `src/editor/`).
+  - **Why not an existing tool.** REXPaint is the roguelike community's standard and Playscii is the open-source equivalent, but neither helps much here for one decisive reason: **half a plan's characters aren't pixels, they're instructions.** `B` is not a tile, it is "put buildings in this shape". No general-purpose ASCII editor can show what comes out, and seeing that is the whole of what makes editing a plan rather than a picture tractable.
+  - So it draws **the plan and the generated result side by side and regenerates as you paint**, with the real game colours and box-drawing. Pencil, line, rect, flood fill and pick; Ctrl+Z takes back a whole stroke rather than one cell; the status line reports what the plan produces (creatures, people, ways out, and what percentage is left to the generator) or the loader's complaint if it can't be read.
+  - **Flood fill is 4-connected**, matching how the generator finds a region — an 8-connected fill would merge two blocks the generator treats as separate, so you'd be painting something other than what you get.
+  - **Ctrl+S writes the real file.** A `plan-saver` Vite plugin serves `/__plan` and is `apply: 'serve'`, so the route exists only on the dev server and the published game has no way to write anything. Without a dev server the editor still opens and falls back to a download.
+  - **A separate page, not a mode of the game.** It shares the tile table, the generator and `WallGlyphs` and nothing else, so it can't reach into the game's state.
+  - `PlanDocument` is pure and DOM-free — the same split the game uses between systems and UI — so the editing operations are tested without a browser. The one that matters: **arbitrary editing always produces text the loader accepts**, because row widths are structural in the document rather than something a person has to count.
+  - On editing by hand instead: the game draws **square** cells (`TILE_SIZE = 20`) while a text editor's are about 0.6 as wide as they are tall, so the map looks stretched. `"editor.fontSize": 13, "editor.lineHeight": 8` squares it up — noted in the plan file's own header, which is where somebody would look.
+  - Verified in a browser: painted a water line with the line tool, watched the result regenerate (137 creatures -> 135), hit Save and confirmed the file changed on disk — then restored it.
 - **All milestones M0-M10 are complete.** The vertical slice is playable end to end: title → town and shop → generated wilderness → two dungeon levels → combat, loot, durability → death and permadeath save-wipe → restart. What comes next is content and systems, not scaffolding — see the Roadmap below, and the deferred narrative-message-log pass noted in M5.
 
 See the plan file referenced above for the full milestone sequence (M0–M10).

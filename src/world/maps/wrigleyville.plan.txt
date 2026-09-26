@@ -3,9 +3,16 @@ Wrigleyville — ruined Chicago, north side
 This file IS the map. One character per tile, 144 x 144. Edit it freely; the game reloads it.
 
   EDITING
-    Turn on overtype/replace mode before you type, or every character you insert shifts the rest
-    of the row and the loader will (rightly) refuse to start. VS Code has no built-in overtype —
-    the "Overtype" extension adds it. Column select is Shift+Alt+drag.
+    Easiest: `npm run dev`, then open /editor.html. It paints with the mouse, shows the real
+    colours, regenerates the right-hand side as you draw, and Ctrl+S writes this file.
+    Pencil / Line / Rect / Fill / Pick, Ctrl+Z to take back a whole stroke.
+
+    By hand in a text editor also works, with two warnings. Turn on overtype/replace first, or
+    every character you insert shifts the rest of the row and the loader will refuse to start —
+    VS Code needs the "Overtype" extension for that. And the game draws square cells while an
+    editor's are about 0.6 as wide as they are tall, so the map looks stretched; roughly
+    `"editor.fontSize": 13, "editor.lineHeight": 8` squares it up.
+
     Every row must be exactly the same length. The loader names the line if one isn't.
 
   DRAWN EXACTLY AS YOU PUT THEM
