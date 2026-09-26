@@ -108,6 +108,46 @@ describe('firing', () => {
     expect(rat.hp).toBeLessThan(rat.maxHp);
   });
 
+  it('does gun-sized damage, not the damage of hitting someone with the gun', () => {
+    /**
+     * The bug this exists for: `fireAt` took its damage from `ItemDef.damage`, which is the
+     * *melee* profile — what clouting somebody with the rifle butt does. Every shot therefore
+     * dealt two or three points, and six of them failed to kill a Restoration trooper.
+     *
+     * The old test did not catch it because it only asked whether damage was nonzero, which two
+     * points satisfies. Asking "is it gun-sized" is the question that would have.
+     */
+    const { state, region } = arena();
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 8, 5);
+    region.monsters.push(trooper);
+
+    fireAt(RIFLE, RIFLE.ranged!, trooper, state, region, cleanHit());
+
+    const dealt = trooper.maxHp - trooper.hp;
+    // A rifle round should take a serious bite out of an armoured man, not chip him.
+    expect(dealt).toBeGreaterThanOrEqual(6);
+
+    // And it must not be the melee profile, which is deliberately feeble — a gun is a poor club.
+    const melee = RIFLE.damage!.reduce((sum, packet) => sum + packet.max, 0);
+    const shot = RIFLE.ranged!.damage.reduce((sum, packet) => sum + packet.max, 0);
+    expect(shot).toBeGreaterThan(melee * 3);
+  });
+
+  it('drops an armoured trooper in a couple of rifle rounds', () => {
+    // The number the report was really about: six shots was absurd, two or three is a rifle.
+    const { state, region } = arena();
+    const trooper = createMonster(MONSTERS['restorationTrooper']!, 8, 5);
+    region.monsters.push(trooper);
+
+    let shots = 0;
+    while (trooper.hp > 0 && shots < 10) {
+      fireAt(RIFLE, RIFLE.ranged!, { x: 8, y: 5 }, state, region, cleanHit());
+      shots += 1;
+    }
+
+    expect(shots).toBeLessThanOrEqual(3);
+  });
+
   it('carries on past what it missed, into whatever is behind', () => {
     // The rule the shared projectile walker exists for. A crowd must not be a wall of immunity.
     const { state, region } = arena();
@@ -186,6 +226,9 @@ describe('firing', () => {
       expect(profile, `${id} should be a firearm`).toBeDefined();
       expect(profile!.noiseRadius).toBeGreaterThan(24); // SHOUT_RADIUS
       expect(profile!.jamChance).toBeGreaterThan(0); // and none of them is reliable
+      // Every gun's shot must out-damage swinging it, or it is a club with extra steps.
+      const melee = ITEMS[id]!.damage!.reduce((sum, packet) => sum + packet.max, 0);
+      expect(profile!.damage.reduce((sum, packet) => sum + packet.max, 0)).toBeGreaterThan(melee * 2);
       expect(ITEMS[profile!.ammo], `${id}'s ammunition should exist`).toBeDefined();
     }
   });

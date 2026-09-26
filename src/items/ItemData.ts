@@ -197,7 +197,14 @@ export const ITEMS: Record<string, ItemDef> = {
     accuracyBonus: -1,
     damage: [{ type: 'bludgeon', min: 1, max: 2 }],
     throwBonus: -20,
-    ranged: { range: 7, ammo: 'looseRound', accuracyBonus: 4, jamChance: 0.16, noiseRadius: 40 },
+    ranged: {
+      damage: [{ type: 'pierce', min: 5, max: 9 }],
+      range: 7,
+      ammo: 'looseRound',
+      accuracyBonus: 4,
+      jamChance: 0.16,
+      noiseRadius: 40,
+    },
   },
 
   /** Longer barrel, steadier, still a pipe. The one worth carrying if you can feed it. */
@@ -215,7 +222,14 @@ export const ITEMS: Record<string, ItemDef> = {
     accuracyBonus: -1,
     damage: [{ type: 'bludgeon', min: 2, max: 3 }],
     throwBonus: -25,
-    ranged: { range: 13, ammo: 'looseRound', accuracyBonus: 10, jamChance: 0.10, noiseRadius: 52 },
+    ranged: {
+      damage: [{ type: 'pierce', min: 8, max: 14 }],
+      range: 13,
+      ammo: 'looseRound',
+      accuracyBonus: 10,
+      jamChance: 0.1,
+      noiseRadius: 52,
+    },
   },
 
   /**
@@ -236,7 +250,16 @@ export const ITEMS: Record<string, ItemDef> = {
     accuracyBonus: -2,
     damage: [{ type: 'bludgeon', min: 2, max: 4 }],
     throwBonus: -30,
-    ranged: { range: 5, ammo: 'shotShell', accuracyBonus: 18, jamChance: 0.20, noiseRadius: 64 },
+    ranged: {
+      // Close enough and it ends the argument, which is what the range, the jam rate and the
+      // half-a-district report are paying for.
+      damage: [{ type: 'pierce', min: 11, max: 20 }],
+      range: 5,
+      ammo: 'shotShell',
+      accuracyBonus: 18,
+      jamChance: 0.2,
+      noiseRadius: 64,
+    },
   },
 
   /** Hand-loaded, and never enough of it. */

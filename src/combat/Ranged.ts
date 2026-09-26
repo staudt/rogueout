@@ -5,6 +5,7 @@ import { addMessage } from '../engine/GameState';
 import type { RNG } from '../utils/RNG';
 import { randomInt } from '../utils/RNG';
 import type { ItemDef } from '../items/ItemData';
+import type { DamagePacket } from './DamageTypes';
 import { resolveProjectile, type ProjectileResult } from './Projectile';
 import { raiseNoise } from '../ai/Actors';
 
@@ -22,6 +23,16 @@ import { raiseNoise } from '../ai/Actors';
  * firing at something you can see summons things you cannot.
  */
 export interface RangedProfile {
+  /**
+   * What the *shot* does — quite separate from `ItemDef.damage`, which is what the weapon does
+   * when you hit somebody with it.
+   *
+   * They were the same field to begin with, and the result was that firing a rifle dealt the
+   * damage of clouting someone with its butt: two or three points, so six shots failed to kill a
+   * Restoration trooper. Guns are supposed to hit hard — the whole design puts their cost in
+   * ammunition, jams and noise rather than in damage — and the bug quietly inverted that.
+   */
+  damage: DamagePacket[];
   /** How far it will carry, in tiles. */
   range: number;
   /** `ItemDef.id` of the ammunition it eats, one per shot. */
@@ -93,7 +104,7 @@ export function fireAt(
     {
       path,
       from: shooter,
-      damage: weapon.damage ?? [{ type: 'pierce', min: 1, max: 3 }],
+      damage: profile.damage,
       toHitBonus: profile.accuracyBonus,
       attackerAgility: shooter.agility,
       attackerFaction: shooter.faction,

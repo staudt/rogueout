@@ -1049,6 +1049,14 @@ export class Game {
       return;
     }
 
+    // With nothing hostile in range the cursor starts on you, and firing there used to report
+    // "no clear shot", which is a baffling thing to be told about your own feet.
+    if (target.x === this.state.player.x && target.y === this.state.player.y) {
+      addMessage(this.state, 'You would have to point it at something.');
+      this.render();
+      return;
+    }
+
     const outcome = fireAt(def, def.ranged, target, this.state, region, this.rng);
 
     if (outcome.kind === 'no-line') {
