@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   instructionRegions,
-  landmarkOrigins,
   parsePlan,
   PlanError,
   roadClassOf,
 } from '../src/world/generation/plan/AreaPlan';
-import { generateFromPlan, PlanMismatchError } from '../src/world/generation/plan/generateFromPlan';
+import { placeAt } from '../src/world/places/Places';
+import { generateFromPlan } from '../src/world/generation/plan/generateFromPlan';
 import { WRIGLEYVILLE } from '../src/world/maps/wrigleyville';
 import { getTileId, isWalkable, type GameMapData } from '../src/world/GameMap';
 import { TILES } from '../src/world/Tile';
 import { reachableWalkable } from '../src/world/generation/connectivity';
-import { wallGlyph } from '../src/ui/WallGlyphs';
+import { isConnectedWall, wallGlyph } from '../src/ui/WallGlyphs';
 import { createGameMap, setTileId } from '../src/world/GameMap';
 import { ensureRegionLoaded } from '../src/world/regions/RegionRegistry';
 import { toSaveData } from '../src/persistence/SaveSchema';
@@ -67,28 +67,6 @@ describe('reading a plan', () => {
     expect(regions[0]!.tiles).toHaveLength(4);
   });
 
-  it('takes a landmark footprint from the tiles marked for it', () => {
-    const plan = parsePlan('t\n---\n.....\n.WWW.\n.WWW.\n.....\n');
-    const found = landmarkOrigins(plan);
-
-    expect(found).toHaveLength(1);
-    expect(found[0]!.id).toBe('wrigleyField');
-    expect(found[0]!.origin).toEqual({ x: 1, y: 1 });
-    expect(found[0]!.size).toEqual({ x: 3, y: 2 });
-  });
-
-  it('refuses a landmark drawn the wrong size, rather than stamping it off the edge', () => {
-    // Clip one row off the park's drawn footprint, so it no longer matches the landmark.
-    const lines = WRIGLEYVILLE.plan.split('\n');
-    // After the separator: the header talks about Wrigley Field and is full of Ws.
-    const gridStart = lines.findIndex((line) => line.trim() === '---') + 1;
-    const firstParkRow = lines.findIndex((line, index) => index >= gridStart && line.includes('W'));
-    lines[firstParkRow] = lines[firstParkRow]!.replace(/W/g, 'B');
-
-    expect(() => generateFromPlan({ ...WRIGLEYVILLE, plan: lines.join('\n') })).toThrow(
-      PlanMismatchError,
-    );
-  });
 });
 
 describe('the drawn area', () => {
@@ -126,6 +104,46 @@ describe('the drawn area', () => {
     expect((count('brick') + count('ruin') + count('thicket')) / total).toBeGreaterThan(0.38);
     expect(count('brick')).toBeGreaterThan(400); // frontage still standing
     expect(count('rubble')).toBeGreaterThan(400); // cave you can walk into
+  });
+});
+
+describe('named places', () => {
+  /**
+   * Landmarks used to be marked with their own character in the plan, which did not scale: the
+   * alphabet would have run out before the interesting places did, and every letter spent on one
+   * was a letter the terrain could not have. They live in a table with their coordinates now, and
+   * the art is drawn by hand in the plan.
+   */
+  it('puts a place where its table says, not where a character marks', () => {
+    const park = WRIGLEYVILLE.places.find((place) => place.id === 'wrigleyField')!;
+    expect(park.rect).toEqual({ x0: 54, y0: 38, x1: 83, y1: 67 });
+
+    // Its people land inside it, because the contents are anchored to the rect.
+    for (const npc of AREA.npcs) {
+      const inside = npc.x >= park.rect.x0 && npc.x <= park.rect.x1 && npc.y >= park.rect.y0 && npc.y <= park.rect.y1;
+      expect(inside, `${npc.name} is outside the park`).toBe(true);
+    }
+  });
+
+  it('gives the player a location rather than a pair of numbers', () => {
+    const park = WRIGLEYVILLE.places.find((place) => place.id === 'wrigleyField')!;
+    expect(placeAt(WRIGLEYVILLE.places, { x: 60, y: 50 })?.name).toBe(park.name);
+    expect(placeAt(WRIGLEYVILLE.places, { x: 5, y: 5 })).toBeNull(); // out on the street
+  });
+
+  it('protects what is drawn inside an authored one from the weather', () => {
+    // The ball park is hand-drawn art. Ruin, flooding and growth must not touch it, or every new
+    // game would quietly redecorate somebody's work.
+    const first = generateFromPlan(WRIGLEYVILLE).map.tiles;
+    const wetter = generateFromPlan({ ...WRIGLEYVILLE, seed: 999 }).map.tiles;
+    const park = WRIGLEYVILLE.places.find((place) => place.id === 'wrigleyField')!;
+
+    for (let y = park.rect.y0; y <= park.rect.y1; y++) {
+      for (let x = park.rect.x0; x <= park.rect.x1; x++) {
+        const index = y * 144 + x;
+        expect(first[index], `the park changed at ${x},${y}`).toBe(wetter[index]);
+      }
+    }
   });
 });
 
@@ -176,12 +194,7 @@ describe('the diagonal', () => {
       'BBBBB.BBB',
     ].join('\n');
 
-    const area = generateFromPlan({
-      ...WRIGLEYVILLE,
-      plan,
-      entry: { x: 3, y: 0 },
-      sanctuaries: [],
-    });
+    const area = generateFromPlan({ ...WRIGLEYVILLE, plan, entry: { x: 3, y: 0 }, places: [] });
 
     // Every tile drawn as road must still be walkable road, not somebody's wall.
     for (const [y, x] of [[0, 3], [1, 3], [2, 4], [3, 4], [4, 5], [5, 5]] as const) {
@@ -213,9 +226,19 @@ describe('connected wall glyphs', () => {
   });
 
   it('leaves ruin alone, because collapse has no right angles', () => {
-    // Box-drawing says "somebody built this square". That is what brick is and what ruin is not.
+    // Box-drawing says "somebody built this square". That is what brick is and what ruin is not —
+    // so ruin keeps its own glyph however its neighbours are arranged.
     const map = createGameMap(3, 3, 'ruin');
-    expect(getTileId(map, 1, 1)).toBe('ruin');
-    expect(TILES['ruin']!.glyph).toBe('*');
+    expect(isConnectedWall(getTileId(map, 1, 1))).toBe(false);
+  });
+
+  it('reads impassable against passable by weight alone', () => {
+    // Shade blocks give the map a density gradient you can take in without thinking: light means
+    // you can cross it, heavy means you cannot. That distinction has been the hardest thing on
+    // this map to make obvious, and it used to rest entirely on remembering that ':' was walkable.
+    expect(TILES['rubble']!.glyph).toBe('░');
+    expect(TILES['ruin']!.glyph).toBe('▓');
+    expect(TILES['rubble']!.walkable).toBe(true);
+    expect(TILES['ruin']!.walkable).toBe(false);
   });
 });

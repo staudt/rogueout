@@ -4,6 +4,7 @@ import type { Monster } from '../entities/Monster';
 import type { Npc } from '../entities/Npc';
 import type { VisibilityData } from '../fov/VisibilityState';
 import type { RegionTransition } from '../world/regions/RegionTypes';
+import type { Rect } from '../world/generation/Rect';
 import type { GroundItem } from '../items/Item';
 import { isVisible } from '../fov/VisibilityState';
 import { chebyshevDistance } from '../utils/geometry';
@@ -25,6 +26,12 @@ export interface RegionState {
    * survive a reload.
    */
   transitions: RegionTransition[];
+  /**
+   * Named somewheres, so the status bar can say "Wrigley Field" rather than a region name. Only
+   * the name and the rect: a place's *contents* are functions in the places table, which is both
+   * unserialisable and already spent by the time a region exists.
+   */
+  places?: Array<{ name: string; rect: Rect }>;
   map: GameMapData;
   /** Lit by the sun: sight is limited by terrain rather than by how far a torch throws. */
   daylight: boolean;

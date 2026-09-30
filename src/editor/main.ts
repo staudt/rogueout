@@ -1,5 +1,5 @@
 import { PlanDocument, type Point } from './PlanDocument';
-import { INSTRUCTIONS, LANDMARK_MARKS, literalTile } from '../world/generation/plan/AreaPlan';
+import { INSTRUCTIONS, literalTile } from '../world/generation/plan/AreaPlan';
 import { generateFromPlan } from '../world/generation/plan/generateFromPlan';
 import { WRIGLEYVILLE } from '../world/maps/wrigleyville';
 import { TILES } from '../world/Tile';
@@ -18,7 +18,9 @@ import { isConnectedWall, wallGlyph } from '../ui/WallGlyphs';
  * Deliberately a separate page from the game. It shares the tile table and the generator and
  * nothing else, and the route that writes the file exists only on the dev server.
  */
-const CELL = 7;
+/** Starting zoom, in pixels per tile. Changed by the zoom control; see `setZoom`. */
+const DEFAULT_CELL = 7;
+const ZOOM_STEPS = [3, 5, 7, 10, 14, 20];
 
 type Tool = 'pencil' | 'line' | 'rect' | 'fill' | 'pick';
 
@@ -43,19 +45,15 @@ const PALETTE: Array<{ char: string; label: string }> = [
   { char: '+', label: 'door' },
   { char: '>', label: 'stairs down' },
   { char: '<', label: 'stairs up' },
-  { char: 'W', label: 'Wrigley Field' },
-  { char: 'A', label: 'Addison station' },
 ];
 
 /** How a plan character looks in the left-hand pane. */
 function planColour(char: string): string {
-  if (char in LANDMARK_MARKS) return '#ffd27a';
   if (char in INSTRUCTIONS) return '#6f7d8c';
   return TILES[literalTile(char) ?? '']?.fg ?? '#888888';
 }
 
 function planBackground(char: string): string {
-  if (char in LANDMARK_MARKS) return '#2a2113';
   if (char in INSTRUCTIONS) return '#14181c';
   return TILES[literalTile(char) ?? '']?.bg ?? '#000000';
 }
@@ -76,9 +74,28 @@ async function boot(): Promise<void> {
   const doc = new PlanDocument(planText);
   const planCanvas = root.querySelector<HTMLCanvasElement>('#plan')!;
   const resultCanvas = root.querySelector<HTMLCanvasElement>('#result')!;
-  for (const canvas of [planCanvas, resultCanvas]) {
-    canvas.width = doc.width * CELL;
-    canvas.height = doc.height * CELL;
+  let cell = DEFAULT_CELL;
+
+  /**
+   * Redraws at a new scale.
+   *
+   * At 20 pixels a tile this is the size the game actually draws it, which is the point of being
+   * able to zoom at all: a map that looks well proportioned shrunk to fit a pane can read quite
+   * differently when you are standing in it.
+   */
+  function setZoom(next: number): void {
+    cell = next;
+    for (const canvas of [planCanvas, resultCanvas]) {
+      canvas.width = doc.width * cell;
+      canvas.height = doc.height * cell;
+    }
+    // Assigning width resets the context, so the font has to be re-applied after.
+    for (const ctx of [planCtx, resultCtx]) {
+      ctx.font = `${cell}px monospace`;
+      ctx.textBaseline = 'top';
+    }
+    root.querySelector('#zoom')!.textContent = `${cell}px`;
+    redraw();
   }
 
   let tool: Tool = 'pencil';
@@ -93,10 +110,6 @@ async function boot(): Promise<void> {
   // --- drawing ------------------------------------------------------------------------------
   const planCtx = planCanvas.getContext('2d')!;
   const resultCtx = resultCanvas.getContext('2d')!;
-  planCtx.font = `${CELL}px monospace`;
-  planCtx.textBaseline = 'top';
-  resultCtx.font = `${CELL}px monospace`;
-  resultCtx.textBaseline = 'top';
 
   function drawPlan(): void {
     planCtx.fillStyle = '#000';
@@ -107,10 +120,10 @@ async function boot(): Promise<void> {
         const bg = planBackground(char);
         if (bg !== '#000000') {
           planCtx.fillStyle = bg;
-          planCtx.fillRect(x * CELL, y * CELL, CELL, CELL);
+          planCtx.fillRect(x * cell, y * cell, cell, cell);
         }
         planCtx.fillStyle = planColour(char);
-        planCtx.fillText(char, x * CELL, y * CELL);
+        planCtx.fillText(char, x * cell, y * cell);
       }
     }
   }
@@ -143,23 +156,46 @@ async function boot(): Promise<void> {
         if (!tile) continue;
         if (tile.bg !== '#000000') {
           resultCtx.fillStyle = tile.bg;
-          resultCtx.fillRect(x * CELL, y * CELL, CELL, CELL);
+          resultCtx.fillRect(x * cell, y * cell, cell, cell);
         }
         resultCtx.fillStyle = tile.fg;
-        resultCtx.fillText(isConnectedWall(id) ? wallGlyph(area.map, x, y) : tile.glyph, x * CELL, y * CELL);
+        resultCtx.fillText(isConnectedWall(id) ? wallGlyph(area.map, x, y) : tile.glyph, x * cell, y * cell);
       }
     }
 
     // Everything living in it, so you can see whether a street you drew is somewhere people are.
     for (const actor of [...area.monsters, ...area.npcs]) {
       resultCtx.fillStyle = actor.fg;
-      resultCtx.fillText(actor.glyph, actor.x * CELL, actor.y * CELL);
+      resultCtx.fillText(actor.glyph, actor.x * cell, actor.y * cell);
     }
+  }
+
+  /**
+   * Outlines every named place and labels it, on both panes.
+   *
+   * Places carry their coordinates in a table rather than being marked in the plan, which is what
+   * lets there be fifty of them — but it also means a rect can drift off the art it describes when
+   * you move something. Drawing them is what keeps that visible instead of silent.
+   */
+  function drawPlaces(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 210, 122, 0.75)';
+    ctx.fillStyle = 'rgba(255, 210, 122, 0.95)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    for (const place of WRIGLEYVILLE.places) {
+      const { x0, y0, x1, y1 } = place.rect;
+      ctx.strokeRect(x0 * cell + 0.5, y0 * cell + 0.5, (x1 - x0 + 1) * cell, (y1 - y0 + 1) * cell);
+      if (cell >= 5) ctx.fillText(place.name, x0 * cell + 2, y0 * cell - cell - 1);
+    }
+    ctx.restore();
   }
 
   function redraw(): void {
     drawPlan();
     drawResult();
+    drawPlaces(planCtx);
+    drawPlaces(resultCtx);
   }
 
   // --- input --------------------------------------------------------------------------------
@@ -287,8 +323,22 @@ async function boot(): Promise<void> {
   }
   saveButton.addEventListener('click', () => void save());
 
+  for (const button of root.querySelectorAll<HTMLButtonElement>('[data-zoom]')) {
+    button.addEventListener('click', () => {
+      const index = ZOOM_STEPS.indexOf(cell);
+      const next = ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, index + Number(button.dataset['zoom'])))];
+      if (next && next !== cell) setZoom(next);
+    });
+  }
+
+  const fitToggle = root.querySelector<HTMLButtonElement>('#fit')!;
+  fitToggle.addEventListener('click', () => {
+    root.querySelector('main')!.classList.toggle('fit');
+    fitToggle.classList.toggle('on');
+  });
+
   refreshPalette();
-  redraw();
+  setZoom(DEFAULT_CELL);
 }
 
 const LAYOUT = `
@@ -301,15 +351,21 @@ const LAYOUT = `
       <button data-tool="fill">Fill</button>
       <button data-tool="pick">Pick</button>
     </span>
+    <span class="tools">
+      <button data-zoom="-1">&minus;</button>
+      <span id="zoom">7px</span>
+      <button data-zoom="1">+</button>
+      <button id="fit" class="on">Fit</button>
+    </span>
     <div id="palette"></div>
     <span class="grow"></span>
     <span id="status">&nbsp;</span>
     <button id="save">Save</button>
   </header>
   <div id="problems"></div>
-  <main>
-    <section><h2>Plan — what you draw</h2><canvas id="plan"></canvas></section>
-    <section><h2>Result — what it makes</h2><canvas id="result"></canvas></section>
+  <main class="fit">
+    <section><h2>Plan — what you draw</h2><div><canvas id="plan"></canvas></div></section>
+    <section><h2>Result — what it makes</h2><div><canvas id="result"></canvas></div></section>
   </main>
 `;
 
@@ -328,13 +384,21 @@ const STYLE = `
   #problems { padding: 6px 12px; border-bottom: 1px solid #222; }
   #problems.bad { background: #3a1616; color: #ffb4b4; }
   #problems.good { background: #11151a; color: #8fa3b5; }
-  main { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
-  main section { flex: 1 1 0; min-width: 0; }
+  /* Two modes. "Fit" scales each pane to the window for an overview; unset, the canvases draw at
+     their true pixel size and each pane scrolls, which is the only way to see the map at the size
+     the game actually renders it. */
+  main { display: flex; gap: 14px; padding: 14px; align-items: flex-start;
+         height: calc(100vh - 92px); box-sizing: border-box; }
+  main section { flex: 1 1 0; min-width: 0; height: 100%;
+                 display: flex; flex-direction: column; }
+  main section > div { overflow: auto; flex: 1; border: 1px solid #222; }
+  main.fit canvas { width: 100%; height: auto; }
+  main.fit section > div { overflow: hidden; }
   h2 { font-size: 12px; font-weight: normal; color: #8fa3b5; margin: 0 0 6px; }
   /* Scaled to the pane rather than drawn at cell size: both halves have to be on screen at once
      or the whole point of showing them together is lost. Mouse coordinates are taken from the
      bounding rect, so painting stays accurate at any scale. */
-  canvas { display: block; width: 100%; height: auto; border: 1px solid #222; cursor: crosshair; }
+  canvas { display: block; cursor: crosshair; }
   #status { color: #8fa3b5; min-width: 90px; }
 `;
 

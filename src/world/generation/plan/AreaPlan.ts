@@ -67,12 +67,6 @@ export const INSTRUCTIONS: Record<string, 'build' | 'collapse' | 'either'> = {
   '?': 'either', // let the damage field decide, as it used to
 };
 
-/** Characters that mark a landmark's footprint. The origin is the shape's top-left corner. */
-export const LANDMARK_MARKS: Record<string, string> = {
-  W: 'wrigleyField',
-  A: 'addisonStation',
-};
-
 export interface AreaPlan {
   width: number;
   height: number;
@@ -125,7 +119,7 @@ export function parsePlan(text: string): AreaPlan {
 }
 
 export function isKnown(char: string): boolean {
-  return char in LITERAL || char in INSTRUCTIONS || char in LANDMARK_MARKS;
+  return char in LITERAL || char in INSTRUCTIONS;
 }
 
 export function literalTile(char: string): string | undefined {
@@ -192,29 +186,3 @@ export function instructionRegions(plan: AreaPlan): Array<{ char: string; tiles:
   return regions;
 }
 
-/** Where each landmark's footprint sits, taken from the bounding box of its marked tiles. */
-export function landmarkOrigins(plan: AreaPlan): Array<{ id: string; origin: Point; size: Point }> {
-  const bounds = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
-
-  for (let y = 0; y < plan.height; y++) {
-    for (let x = 0; x < plan.width; x++) {
-      const id = LANDMARK_MARKS[plan.cells[y * plan.width + x]!];
-      if (!id) continue;
-
-      const box = bounds.get(id);
-      if (!box) bounds.set(id, { x0: x, y0: y, x1: x, y1: y });
-      else {
-        box.x0 = Math.min(box.x0, x);
-        box.y0 = Math.min(box.y0, y);
-        box.x1 = Math.max(box.x1, x);
-        box.y1 = Math.max(box.y1, y);
-      }
-    }
-  }
-
-  return [...bounds].map(([id, box]) => ({
-    id,
-    origin: { x: box.x0, y: box.y0 },
-    size: { x: box.x1 - box.x0 + 1, y: box.y1 - box.y0 + 1 },
-  }));
-}

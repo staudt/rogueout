@@ -36,16 +36,32 @@ export const TILES: Record<string, TileDef> = {
   /**
    * Debris you can pick your way over. The one tile that makes ruin interesting rather than just
    * subtractive: a collapsed building becomes a shortcut through a block instead of a longer wall.
+   *
+   * Drawn with the light shade block. Together with `ruin`'s dense one that gives the map a
+   * **density gradient you can read without thinking** — light means you can cross it, heavy means
+   * you can't — which is the distinction the city has always had the most trouble making obvious.
+   * (The *plan* file still spells it `:`; plan characters stay ASCII so the map is typeable on any
+   * keyboard, and what a tile looks like is the renderer's business.)
+   *
+   * Muted well below the `:` it replaced, for the same reason `ruin` was: a shade block lays down
+   * several times the ink of a dot, and at its old colour the cave floors out-shouted the streets
+   * — which inverts the hierarchy the whole map is built on.
    */
-  rubble: { id: 'rubble', glyph: ':', fg: '#9c9288', bg: '#1d1b17', walkable: true, opaque: false },
+  rubble: { id: 'rubble', glyph: '░', fg: '#5c554d', bg: '#1a1815', walkable: true, opaque: false },
   /**
    * Collapse too total to cross. This is what district boundaries are made of, and what the outer
    * edge of an area is filled with, so the world ends in rubble rather than an arbitrary wall.
    *
-   * Shares `*` with `rock`, deliberately: both mean "impassable heap", and they never appear in
-   * the same kind of place — rock is open terrain, ruin is a city block. The colours differ.
+   * Drawn with the dense shade block, against `rubble`'s light one: a filled cell reads as solid
+   * mass at a glance, where `*` read as scatter. It also contrasts properly with the box-drawing
+   * on `brick` — deliberate structure against formless collapse.
+   *
+   * Note how much darker it is than the `*` it replaced. **A glyph that fills its cell carries far
+   * more visual weight than a sparse one at the same colour**, and keeping the old grey turned
+   * every ruined block into a glaring pale slab that drowned the streets. Swapping a glyph for a
+   * denser one is a colour change as much as a shape change.
    */
-  ruin: { id: 'ruin', glyph: '*', fg: '#5d574f', bg: '#151311', walkable: false, opaque: true },
+  ruin: { id: 'ruin', glyph: '▓', fg: '#3d3833', bg: '#141210', walkable: false, opaque: true },
 
   // Wilderness terrain (M6, produced by world/generation/*). Glyphs are picked to not collide with
   // any item glyph (`)`, `[`, `!`) or monster glyph (lowercase letters), so a tile is never

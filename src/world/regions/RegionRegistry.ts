@@ -43,6 +43,7 @@ export interface RegionDef {
 
 interface RegionStateOptions {
   name: string;
+  places?: Array<{ name: string; rect: import('../generation/Rect').Rect }>;
   map: GameMapData;
   arrival?: string;
   /** Open sky: see DAYLIGHT_SIGHT_RADIUS and RegionState.daylight. */
@@ -55,9 +56,10 @@ interface RegionStateOptions {
 }
 
 function makeRegionState(options: RegionStateOptions): RegionState {
-  const { name, map, arrival, daylight = false, transitions = [], monsters = [], groundItems = [], npcs = [], patrolRoute } = options;
+  const { name, places, map, arrival, daylight = false, transitions = [], monsters = [], groundItems = [], npcs = [], patrolRoute } = options;
   return {
     name,
+    ...(places ? { places } : {}),
     arrival,
     transitions,
     map,
@@ -135,6 +137,7 @@ export const REGIONS: Record<string, RegionDef> = {
         npcs: city.npcs,
         groundItems: city.groundItems,
         patrolRoute: city.patrolRoute,
+        places: city.places,
         monsters: [
           ...city.monsters,
           // The Wake work Addison, and the Restoration hold it against them. Two bands on one

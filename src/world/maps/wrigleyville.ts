@@ -1,6 +1,6 @@
 import type { PlannedArea } from '../generation/plan/generateFromPlan';
+import { WRIGLEYVILLE_PLACES, WRIGLEY_SPAWN_LOCAL } from '../places/wrigleyvillePlaces';
 import WRIGLEYVILLE_PLAN from './wrigleyville.plan.txt?raw';
-import { WRIGLEY_CLUBHOUSE_DOOR, WRIGLEY_SIZE, WRIGLEY_SPAWN } from '../landmarks/wrigleyField';
 
 /**
  * Wrigleyville: the first area of ruined Chicago, and where the game now begins.
@@ -31,8 +31,8 @@ export const WRIGLEY_ORIGIN = { x: 54, y: 38 };
 
 /** Where you wake, on the concourse just inside the marquee. */
 export const WRIGLEYVILLE_SPAWN = {
-  x: WRIGLEY_ORIGIN.x + WRIGLEY_SPAWN.x,
-  y: WRIGLEY_ORIGIN.y + WRIGLEY_SPAWN.y,
+  x: WRIGLEY_ORIGIN.x + WRIGLEY_SPAWN_LOCAL.x,
+  y: WRIGLEY_ORIGIN.y + WRIGLEY_SPAWN_LOCAL.y,
 };
 
 export const ADDISON_STATION_ORIGIN = { x: 98, y: 59 };
@@ -50,10 +50,7 @@ export const WRIGLEYVILLE_SPAWN_FROM_TUNNELS = { x: 103, y: 70 };
 export const ADDISON_STATION_STAIRS = { x: ADDISON_STATION_ORIGIN.x + 5, y: ADDISON_STATION_ORIGIN.y + 4 };
 
 /** Where the clubhouse puts you back: one step south of its door, out under the stands. */
-export const WRIGLEY_CLUBHOUSE_EXIT = {
-  x: WRIGLEY_ORIGIN.x + WRIGLEY_CLUBHOUSE_DOOR.x,
-  y: WRIGLEY_ORIGIN.y + WRIGLEY_CLUBHOUSE_DOOR.y + 1,
-};
+export const WRIGLEY_CLUBHOUSE_EXIT = { x: WRIGLEY_ORIGIN.x + 14, y: WRIGLEY_ORIGIN.y + 3 };
 
 /**
  * The area itself lives in `wrigleyville.plan.txt` — one character per tile, drawn by hand. What
@@ -67,6 +64,7 @@ export const WRIGLEYVILLE: PlannedArea = {
   plan: WRIGLEYVILLE_PLAN,
   seed: WRIGLEYVILLE_SEED,
   entry: WRIGLEYVILLE_SPAWN,
+  places: WRIGLEYVILLE_PLACES,
 
   // This area's offset in a city-wide tile frame. Costs one field and is what later makes "the
   // Loop is a long way south" a computable fact rather than a guess.
@@ -75,10 +73,3 @@ export const WRIGLEYVILLE: PlannedArea = {
   decay: 0.02,
 };
 
-/** Bounds of the park in world coordinates — used by content that wants "inside the settlement". */
-export const WRIGLEY_RECT = {
-  x0: WRIGLEY_ORIGIN.x,
-  y0: WRIGLEY_ORIGIN.y,
-  x1: WRIGLEY_ORIGIN.x + WRIGLEY_SIZE - 1,
-  y1: WRIGLEY_ORIGIN.y + WRIGLEY_SIZE - 1,
-};

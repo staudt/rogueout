@@ -5,7 +5,7 @@ import type { Monster } from '../../../entities/Monster';
 import type { Npc } from '../../../entities/Npc';
 import type { GroundItem } from '../../../items/Item';
 import type { RegionTransition } from '../../regions/RegionTypes';
-import { LANDMARKS, landmarkRect, type LandmarkDef } from '../../landmarks/LandmarkRegistry';
+import type { Place, PlaceContents } from '../../places/Places';
 import { reachableWalkable, sealDisconnectedAreas } from '../connectivity';
 import { carveCorridor } from '../stitching';
 import type { Rect } from '../Rect';
@@ -18,7 +18,6 @@ import { applyVegetation } from '../city/vegetation';
 import { populate } from '../city/inhabitants';
 import {
   instructionRegions,
-  landmarkOrigins,
   literalTile,
   parsePlan,
   planAt,
@@ -40,8 +39,8 @@ export interface PlannedArea {
   entry: Point;
   /** Where this area sits in a city-wide tile frame. */
   worldOrigin: { x: number; y: number };
-  /** Wildlife isn't scattered into these. Landmark footprints are added automatically. */
-  sanctuaries?: Rect[];
+  /** Named somewheres, with their coordinates. See `places/Places.ts`. */
+  places: Place[];
   /** Raises damage everywhere in the procedural regions, 0..1. */
   decay?: number;
 }
@@ -55,6 +54,8 @@ export interface GeneratedArea {
   patrolRoute: Point[];
   /** How busy each tile's road is, row-major. Content density reads it. */
   roadClass: Uint8Array;
+  /** Named somewheres, for the location readout. */
+  places: Array<{ name: string; rect: Rect }>;
 }
 
 /**
@@ -91,40 +92,32 @@ export function generateFromPlan(area: PlannedArea): GeneratedArea {
     }
   }
 
-  // 2. Landmarks, stamped over their marked footprint and then protected from everything after.
-  const contents = {
-    transitions: [] as RegionTransition[],
-    npcs: [] as Npc[],
-    monsters: [] as Monster[],
-    groundItems: [] as GroundItem[],
+  // 2. The named places. They draw nothing — the art is in the plan — but what is drawn inside an
+  //    authored one is protected from everything after, which is what makes hand-drawn work safe
+  //    on a map that is otherwise being weathered.
+  const contents: PlaceContents & Required<Pick<PlaceContents, 'transitions' | 'npcs' | 'monsters' | 'groundItems'>> = {
+    transitions: [],
+    npcs: [],
+    monsters: [],
+    groundItems: [],
   };
   const anchors: Point[] = [area.entry];
-  const sanctuaries: Rect[] = [...(area.sanctuaries ?? [])];
+  const sanctuaries: Rect[] = [];
 
-  for (const placed of landmarkOrigins(plan)) {
-    const def: LandmarkDef | undefined = LANDMARKS[placed.id];
-    if (!def) continue;
+  for (const place of area.places) {
+    const origin = { x: place.rect.x0, y: place.rect.y0 };
+    if (place.authored) canvas.protect(place.rect);
+    if (place.sanctuary) sanctuaries.push(place.rect);
 
-    if (def.width !== placed.size.x || def.height !== placed.size.y) {
-      throw new PlanMismatchError(
-        `${area.id}: ${def.name} is drawn ${placed.size.x}x${placed.size.y} but is ` +
-          `${def.width}x${def.height}. Resize its footprint in the plan, or the landmark.`,
-      );
-    }
-
-    def.stamp((x, y, tileId) => canvas.set(placed.origin.x + x, placed.origin.y + y, tileId));
-    canvas.protect(landmarkRect(def, placed.origin));
-    sanctuaries.push(landmarkRect(def, placed.origin));
-
-    const produced = def.contents?.(placed.origin);
+    const produced = place.contents?.(origin);
     if (produced) {
       contents.transitions.push(...(produced.transitions ?? []));
       contents.npcs.push(...(produced.npcs ?? []));
       contents.monsters.push(...(produced.monsters ?? []));
       contents.groundItems.push(...(produced.groundItems ?? []));
     }
-    for (const anchor of def.anchors ?? []) {
-      anchors.push({ x: placed.origin.x + anchor.x, y: placed.origin.y + anchor.y });
+    for (const anchor of place.anchors ?? []) {
+      anchors.push({ x: origin.x + anchor.x, y: origin.y + anchor.y });
     }
   }
 
@@ -190,6 +183,7 @@ export function generateFromPlan(area: PlannedArea): GeneratedArea {
     monsters: [...contents.monsters, ...populate(map, rng, sanctuaries, roadClass)],
     patrolRoute: patrolAlongArterial(map, roadClass, plan.width, plan.height),
     roadClass,
+    places: area.places.map((place) => ({ name: place.name, rect: place.rect })),
   };
 }
 

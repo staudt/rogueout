@@ -8,16 +8,12 @@ import { ensureRegionLoaded, REGION_BUILDERS } from '../src/world/regions/Region
 import { CLUBHOUSE_RECIPE } from '../src/world/regions/clubhouse';
 import { getTileId } from '../src/world/GameMap';
 import { isDeliberateTransition, transitionKind } from '../src/world/Tile';
-import { WRIGLEY_CLUBHOUSE_DOOR } from '../src/world/landmarks/wrigleyField';
 import { WRIGLEY_ORIGIN } from '../src/world/maps/wrigleyville';
 import { createMemoryStorage } from '../src/persistence/LocalStorageAdapter';
 import { loadGame, saveGame } from '../src/persistence/SaveGame';
 
 /** The clubhouse door, in world coordinates. */
-const DOOR = {
-  x: WRIGLEY_ORIGIN.x + WRIGLEY_CLUBHOUSE_DOOR.x,
-  y: WRIGLEY_ORIGIN.y + WRIGLEY_CLUBHOUSE_DOOR.y,
-};
+const DOOR = { x: WRIGLEY_ORIGIN.x + 14, y: WRIGLEY_ORIGIN.y + 2 };
 
 function makeGame(x: number, y: number, regionId = 'wrigleyville') {
   const regions: Record<string, RegionState> = {};

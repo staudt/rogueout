@@ -1,6 +1,16 @@
 import { getActiveRegion, type GameState } from '../engine/GameState';
+import { placeAt } from '../world/places/Places';
 import { ITEMS } from '../items/ItemData';
 import type { Item } from '../items/Item';
+
+function locationName(state: GameState): string {
+  const region = getActiveRegion(state);
+  const place = placeAt(
+    (region.places ?? []).map((p) => ({ id: p.name, name: p.name, rect: p.rect })),
+    state.player,
+  );
+  return place?.name ?? region.name;
+}
 
 /** Below which fraction of max HP the readout turns red. */
 const LOW_HP_FRACTION = 1 / 3;
@@ -57,7 +67,9 @@ export function statusFields(state: GameState): Field[] {
     { label: 'Caps', value: String(player.caps) },
     { label: 'Weapon', value: describeEquipped(player.equipment.weapon) },
     { label: 'Armor', value: describeEquipped(player.equipment.armor) },
-    { label: '', value: getActiveRegion(state).name },
+    // Where you are, as specifically as the map can say: the named place you're standing in, or
+    // the region when you're out on the open street.
+    { label: '', value: locationName(state) },
     { label: 'Turn', value: String(state.turnCount) },
   ];
 }
